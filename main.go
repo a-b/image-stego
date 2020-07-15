@@ -13,6 +13,11 @@ import (
 )
 
 func main() {
+	if len(os.Args) > 0 && os.Args[1] == "-d" {
+		Decode()
+		return
+	}
+
 	filename := "rect.png"
 	fmt.Println("Operating on", filename)
 
@@ -120,53 +125,8 @@ func main() {
 		log.Fatal(err)
 	}
 
-	//// Get the Merkle Root of the tree
-	//mr := t.MerkleRoot()
-	//fmt.Println("MerkleRoot", hex.EncodeToString(mr))
-	//
-	////Verify the entire tree (hashes for each node) is valid
-	//vt, err := t.VerifyTree()
-	//if err != nil {
-	//	log.Fatal(err)
-	//}
-	//fmt.Println("Verify Tree: ", vt)
-	//
-	//fmt.Println("GetMerklePath")
-	//
-	//vChunk := list[4]
-	//paths, indexes, err := t.GetMerklePath(vChunk)
-	//prevHash, _ := vChunk.CalculateHash()
-	//for i, side := range indexes {
-	//	hsh := sha256.New()
-	//	w := []byte{}
-	//	if side == 1 { // right
-	//		w = append(w, prevHash...)
-	//		w = append(w, paths[i]...)
-	//	} else if side == 0 { // left
-	//		w = append(w, paths[i]...)
-	//		w = append(w, prevHash...)
-	//	}
-	//	hsh.Write(w)
-	//	prevHash = hsh.Sum(nil)
-	//}
-	//
-	//fmt.Println("MerkleRoot Calculated", hex.EncodeToString(prevHash))
 
 }
-
-//type TestContent struct {
-//	hashString string
-//}
-//
-////CalculateHash hashes the values of a TestContent
-//func (t TestContent) CalculateHash() ([]byte, error) {
-//	return hex.DecodeString(t.hashString)
-//}
-//
-////Equals tests for equality of two Contents
-//func (t TestContent) Equals(other merkletree.Content) (bool, error) {
-//	return t.hashString == other.(TestContent).hashString, nil
-//}
 
 // WithLSB returns the given byte with the least significant bit (LSB) set to
 // the given bit value, while true means 1 and false means 0.
@@ -176,6 +136,15 @@ func WithLSB(b byte, bit bool) byte {
 	} else {
 		return b & 0xFE
 	}
+}
+
+
+// GetLSB given a byte, will return the least significant bit of that byte
+func GetLSB(b byte) bool {
+	if b%2 == 0 {
+		return false
+	}
+	return true
 }
 
 // imageToRGBA converts image.Image to image.RGBA

@@ -107,3 +107,63 @@ func (c *Chunk) Write(p []byte) (n int, err error) {
 func BitAtIdx(b byte, i uint8) bool {
 	return bits.OnesCount8(byte(1<<i)&b) > 0
 }
+
+func (c *Chunk) ReadLSB() ([]byte, error) {
+	byteArr := []byte{}
+	i := 0
+	for i < len(c.Pix) {
+		newByte := uint8(0)
+		for j := 0; j < 8; j++ {
+			if GetLSB(c.Pix[i+j]) {
+				newByte = newByte | byte(1<<j)
+			}
+		}
+		byteArr = append(byteArr, newByte)
+		i += 8
+	}
+	return byteArr, nil
+}
+
+func (c *Chunk) LSBHash() ([]byte, error) {
+
+	lsbByteArr, err := c.ReadLSB()
+	if err != nil {
+		return nil, err
+	}
+
+	sides := []bool{}
+	paths := [][]byte{}
+	for i, b := range lsbByteArr {
+		if i%32 == 0 {
+			if b == 1 {
+				sides = append(sides, true)
+			} else {
+				sides = append(sides, false)
+			}
+			paths = append(paths, []byte{})
+			continue
+		}
+		paths[(i-1)/32] = append(paths[(i-1)/32], b)
+	}
+
+	prevHash, err := c.CalculateHash()
+	if err != nil {
+		return nil, err
+	}
+
+	for i, side := range sides {
+		hsh := sha256.New()
+		w := []byte{}
+		if side { // right
+			w = append(w, prevHash...)
+			w = append(w, paths[i]...)
+		} else { // left
+			w = append(w, paths[i]...)
+			w = append(w, prevHash...)
+		}
+		hsh.Write(w)
+		prevHash = hsh.Sum(nil)
+	}
+
+	return prevHash, nil
+}
