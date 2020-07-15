@@ -1,13 +1,12 @@
 package main
 
 import (
-	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
 	"github.com/cbergoon/merkletree"
-	"github.com/pkg/errors"
 	"image"
 	"image/draw"
+	"image/png"
 	_ "image/png"
 	"log"
 	"os"
@@ -63,18 +62,19 @@ func main() {
 	fmt.Println("Chunk counts: ", chunkCountX, chunkCountY)
 	fmt.Println("Chunk dimensions: ", chunkWidth, chunkHeight)
 
-	fmt.Println("Starting...")
+	fmt.Println("Start building merkle tree...")
 	var list []merkletree.Content
 	for cx := 0; cx < chunkCountX; cx++ {
 		for cy := 0; cy < chunkCountY; cy++ {
 			fmt.Println("-- Checking chunk at", cx, cy)
-			chunk := Chunk{
-				image: image.NewRGBA(rgbaImage.Rect),
+			chunk := &Chunk{
+				RGBA: image.NewRGBA(image.Rect(0, 0, chunkWidth, chunkHeight)),
+				n:    0,
 			}
 			for x := 0; x < chunkWidth; x++ {
 				for y := 0; y < chunkHeight; y++ {
 					color := rgbaImage.RGBAAt(cx*chunkWidth+x, cy*chunkHeight+y)
-					chunk.image.Set(x, y, color)
+					chunk.Set(x, y, color)
 				}
 			}
 			hash, _ := chunk.CalculateHash()
@@ -82,121 +82,95 @@ func main() {
 			list = append(list, chunk)
 		}
 	}
-	//Create a new Merkle Tree from the list of Content
+
+	// Create a new Merkle Tree from the list of Content
 	t, err := merkletree.NewTree(list)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	//Get the Merkle Root of the tree
-	mr := t.MerkleRoot()
-	fmt.Println("MerkleRoot", hex.EncodeToString(mr))
+	fmt.Println("Start writing image...")
+	destImg := image.NewRGBA(image.Rect(0, 0, m.Bounds().Dx(), m.Bounds().Dy()))
+	for cx := 0; cx < chunkCountX; cx++ {
+		for cy := 0; cy < chunkCountY; cy++ {
+			chunk := list[cx*chunkCountY+cy].(*Chunk)
+			paths, sides, err := t.GetMerklePath(chunk)
+			if err != nil {
+				log.Fatal(err)
+			}
 
-	//Verify the entire tree (hashes for each node) is valid
-	vt, err := t.VerifyTree()
+			for i, path := range paths {
+				side := uint8(sides[i])
+				if _, err := chunk.Write(append([]byte{side}, path...)); err != nil {
+					log.Fatal(err)
+				}
+			}
+			draw.Draw(destImg, chunk.Bounds().Add(image.Pt(cx*chunkWidth, cy*chunkHeight)), chunk, image.Point{}, draw.Src)
+		}
+	}
+
+	f, err := os.Create("outimage.png")
+	if err != nil {
+		// Handle error
+	}
+	defer f.Close()
+
+	err = png.Encode(f, destImg)
 	if err != nil {
 		log.Fatal(err)
 	}
-	fmt.Println("Verify Tree: ", vt)
 
-	fmt.Println("GetMerklePath")
-
-	vChunk := list[4]
-	paths, indexes, err := t.GetMerklePath(vChunk)
-	prevHash, _ := vChunk.CalculateHash()
-	for i, side := range indexes {
-		hsh := sha256.New()
-		w := []byte{}
-		if side == 1 { // right
-			w = append(w, prevHash...)
-			w = append(w, paths[i]...)
-		} else if side == 0 { // left
-			w = append(w, paths[i]...)
-			w = append(w, prevHash...)
-		}
-		hsh.Write(w)
-		prevHash = hsh.Sum(nil)
-	}
-
-	fmt.Println("MerkleRoot Calculated", hex.EncodeToString(prevHash))
+	//// Get the Merkle Root of the tree
+	//mr := t.MerkleRoot()
+	//fmt.Println("MerkleRoot", hex.EncodeToString(mr))
+	//
+	////Verify the entire tree (hashes for each node) is valid
+	//vt, err := t.VerifyTree()
+	//if err != nil {
+	//	log.Fatal(err)
+	//}
+	//fmt.Println("Verify Tree: ", vt)
+	//
+	//fmt.Println("GetMerklePath")
+	//
+	//vChunk := list[4]
+	//paths, indexes, err := t.GetMerklePath(vChunk)
+	//prevHash, _ := vChunk.CalculateHash()
+	//for i, side := range indexes {
+	//	hsh := sha256.New()
+	//	w := []byte{}
+	//	if side == 1 { // right
+	//		w = append(w, prevHash...)
+	//		w = append(w, paths[i]...)
+	//	} else if side == 0 { // left
+	//		w = append(w, paths[i]...)
+	//		w = append(w, prevHash...)
+	//	}
+	//	hsh.Write(w)
+	//	prevHash = hsh.Sum(nil)
+	//}
+	//
+	//fmt.Println("MerkleRoot Calculated", hex.EncodeToString(prevHash))
 
 }
 
-type TestContent struct {
-	hashString string
-}
+//type TestContent struct {
+//	hashString string
+//}
+//
+////CalculateHash hashes the values of a TestContent
+//func (t TestContent) CalculateHash() ([]byte, error) {
+//	return hex.DecodeString(t.hashString)
+//}
+//
+////Equals tests for equality of two Contents
+//func (t TestContent) Equals(other merkletree.Content) (bool, error) {
+//	return t.hashString == other.(TestContent).hashString, nil
+//}
 
-//CalculateHash hashes the values of a TestContent
-func (t TestContent) CalculateHash() ([]byte, error) {
-	return hex.DecodeString(t.hashString)
-}
-
-//Equals tests for equality of two Contents
-func (t TestContent) Equals(other merkletree.Content) (bool, error) {
-	return t.hashString == other.(TestContent).hashString, nil
-}
-
-type Chunk struct {
-	image *image.RGBA
-}
-
-func (c Chunk) CalculateHash() ([]byte, error) {
-	h := sha256.New()
-
-	for x := 0; x < c.image.Bounds().Size().X; x++ {
-		for y := 0; y < c.image.Bounds().Size().Y; y++ {
-			color := c.image.RGBAAt(x, y)
-			byt := []byte{
-				setLSB(color.R, false),
-				setLSB(color.G, false),
-				setLSB(color.B, false),
-			}
-			if _, err := h.Write(byt); err != nil {
-				return nil, err
-			}
-		}
-	}
-
-	return h.Sum(nil), nil
-}
-
-//Equals tests for equality of two Contents
-func (c Chunk) Equals(o merkletree.Content) (bool, error) {
-	otherChunk, ok := o.(Chunk)
-	if !ok {
-		return false, errors.New("Invalid type")
-	}
-	if otherChunk.image.Bounds().Size().X != c.image.Bounds().Size().X {
-		return false, nil
-	}
-	if otherChunk.image.Bounds().Size().Y != c.image.Bounds().Size().Y {
-		return false, nil
-	}
-
-	for x := 0; x < c.image.Bounds().Size().X; x++ {
-		for y := 0; y < c.image.Bounds().Size().Y; y++ {
-			thisColor := c.image.RGBAAt(x, y)
-			otherColor := otherChunk.image.RGBAAt(x, y)
-			if setLSB(thisColor.R, false) != setLSB(otherColor.R, false) {
-				return false, nil
-			}
-			if setLSB(thisColor.G, false) != setLSB(otherColor.G, false) {
-				return false, nil
-			}
-			if setLSB(thisColor.B, false) != setLSB(otherColor.B, false) {
-				return false, nil
-			}
-			if setLSB(thisColor.A, false) != setLSB(otherColor.A, false) {
-				return false, nil
-			}
-		}
-	}
-
-	return true, nil
-}
-
-// setLSB given a byte will set that byte's least significant bit to a given value (where true is 1 and false is 0)
-func setLSB(b byte, bit bool) byte {
+// WithLSB returns the given byte with the least significant bit (LSB) set to
+// the given bit value, while true means 1 and false means 0.
+func WithLSB(b byte, bit bool) byte {
 	if bit {
 		return b | 1
 	} else {
