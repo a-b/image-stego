@@ -106,7 +106,11 @@ func (c *Chunk) Write(p []byte) (n int, err error) {
 	for i := 0; i < len(p); i++ {
 
 		buffer := make([]byte, 8)
-		bitOff := i * 8
+		bitOff := c.off+i * 8
+
+		if bitOff+7 >= len(c.Pix) {
+			return n, io.EOF
+		}
 
 		for j := range buffer {
 
@@ -115,15 +119,11 @@ func (c *Chunk) Write(p []byte) (n int, err error) {
 				return n, err
 			}
 
-			if c.off+bitOff+j == len(c.Pix) {
-				return n, io.EOF
-			}
-
-			buffer[j] = WithLSB(c.Pix[c.off+bitOff+j], bit)
+			buffer[j] = WithLSB(c.Pix[bitOff+j], bit)
 		}
 
 		for j, b := range buffer {
-			c.Pix[c.off+bitOff+j] = b
+			c.Pix[bitOff+j] = b
 		}
 
 		n += 1
