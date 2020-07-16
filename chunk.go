@@ -108,14 +108,14 @@ func (c *Chunk) Write(p []byte) (n int, err error) {
 		buffer := make([]byte, 8)
 		bitOff := i * 8
 
-		for j := 0; j < 8; j++ {
+		for j := range buffer {
 
 			bit, err := r.ReadBool()
 			if err != nil {
 				return n, err
 			}
 
-			if c.off+bitOff+j >= len(c.Pix) {
+			if c.off+bitOff+j == len(c.Pix) {
 				return n, io.EOF
 			}
 
