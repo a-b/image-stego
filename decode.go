@@ -65,7 +65,6 @@ func Decode() {
 			fmt.Println("-- Checking chunk at", cx, cy)
 			chunk := &Chunk{
 				RGBA: image.NewRGBA(image.Rect(0, 0, chunkWidth, chunkHeight)),
-				n:    0,
 			}
 			for x := 0; x < chunkWidth; x++ {
 				for y := 0; y < chunkHeight; y++ {

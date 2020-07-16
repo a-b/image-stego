@@ -1,19 +1,20 @@
 package main
 
 import (
-	"bufio"
 	"bytes"
 	"crypto/sha256"
 	"errors"
 	"github.com/cbergoon/merkletree"
 	"github.com/icza/bitio"
 	"image"
+	"io"
 	"math/bits"
 )
 
 type Chunk struct {
 	*image.RGBA
-	n int // written bytes
+	// offset of written bits
+	off int
 }
 
 // Width is a short hand to return the width in pixels of the chunk
@@ -93,18 +94,41 @@ func (c *Chunk) Equals(o merkletree.Content) (bool, error) {
 	return true, nil
 }
 
-// Write writes the given bytes to the least significant bits of the chunk.
-func (c *Chunk) Write(p []byte) (int, error) {
+// Write writes the given bytes to the least significant bits of the chunk. It returns the number of bytes written from p
+// A byte from p is either written completely or not at all.
+func (c *Chunk) Write(p []byte) (n int, err error) {
 	r := bitio.NewReader(bytes.NewBuffer(p))
+
+	defer func() {
+		c.off += n * 8
+	}()
+
 	for i := 0; i < len(p); i++ {
-		bit, err := r.ReadBool()
-		if err != nil {
-			return c.n, err
+
+		buffer := make([]byte, 8)
+		bitOff := i * 8
+
+		for j := 0; j < 8; j++ {
+
+			bit, err := r.ReadBool()
+			if err != nil {
+				return n, err
+			}
+
+			if c.off+bitOff+j >= len(c.Pix) {
+				return n, io.EOF
+			}
+
+			buffer[j] = WithLSB(c.Pix[c.off+bitOff+j], bit)
 		}
-		c.Pix[i] = WithLSB(c.Pix[i], bit)
-		c.n += 1
+
+		for j, b := range buffer {
+			c.Pix[c.off+bitOff+j] = b
+		}
+
+		n += 1
 	}
-	return c.n, nil
+	return n, nil
 }
 
 // BitAtIdx returns true if the bit at the given index is 1 and false if it is 0
@@ -128,45 +152,45 @@ func (c *Chunk) Read(p []byte) (int, error) {
 }
 
 func (c *Chunk) LSBHash() ([]byte, error) {
-
-	lsbByteArr, err := c.ReadLSB()
-	if err != nil {
-		return nil, err
-	}
-
-	sides := []bool{}
-	paths := [][]byte{}
-	for i, b := range lsbByteArr {
-		if i%32 == 0 {
-			if b == 1 {
-				sides = append(sides, true)
-			} else {
-				sides = append(sides, false)
-			}
-			paths = append(paths, []byte{})
-			continue
-		}
-		paths[(i-1)/32] = append(paths[(i-1)/32], b)
-	}
+	//
+	//lsbByteArr, err := c.ReadLSB()
+	//if err != nil {
+	//	return nil, err
+	//}
+	//
+	//sides := []bool{}
+	//paths := [][]byte{}
+	//for i, b := range lsbByteArr {
+	//	if i%32 == 0 {
+	//		if b == 1 {
+	//			sides = append(sides, true)
+	//		} else {
+	//			sides = append(sides, false)
+	//		}
+	//		paths = append(paths, []byte{})
+	//		continue
+	//	}
+	//	paths[(i-1)/32] = append(paths[(i-1)/32], b)
+	//}
 
 	prevHash, err := c.CalculateHash()
 	if err != nil {
 		return nil, err
 	}
-
-	for i, side := range sides {
-		hsh := sha256.New()
-		w := []byte{}
-		if side { // right
-			w = append(w, prevHash...)
-			w = append(w, paths[i]...)
-		} else { // left
-			w = append(w, paths[i]...)
-			w = append(w, prevHash...)
-		}
-		hsh.Write(w)
-		prevHash = hsh.Sum(nil)
-	}
+	//
+	//for i, side := range sides {
+	//	hsh := sha256.New()
+	//	w := []byte{}
+	//	if side { // right
+	//		w = append(w, prevHash...)
+	//		w = append(w, paths[i]...)
+	//	} else { // left
+	//		w = append(w, paths[i]...)
+	//		w = append(w, prevHash...)
+	//	}
+	//	hsh.Write(w)
+	//	prevHash = hsh.Sum(nil)
+	//}
 
 	return prevHash, nil
 }

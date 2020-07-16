@@ -74,7 +74,6 @@ func main() {
 			fmt.Println("-- Checking chunk at", cx, cy)
 			chunk := &Chunk{
 				RGBA: image.NewRGBA(image.Rect(0, 0, chunkWidth, chunkHeight)),
-				n:    0,
 			}
 			for x := 0; x < chunkWidth; x++ {
 				for y := 0; y < chunkHeight; y++ {
@@ -126,25 +125,6 @@ func main() {
 	}
 
 
-}
-
-// WithLSB returns the given byte with the least significant bit (LSB) set to
-// the given bit value, while true means 1 and false means 0.
-func WithLSB(b byte, bit bool) byte {
-	if bit {
-		return b | 1
-	} else {
-		return b & 0xFE
-	}
-}
-
-
-// GetLSB given a byte, will return the least significant bit of that byte
-func GetLSB(b byte) bool {
-	if b%2 == 0 {
-		return false
-	}
-	return true
 }
 
 // imageToRGBA converts image.Image to image.RGBA
