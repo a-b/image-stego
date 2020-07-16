@@ -1,9 +1,12 @@
 package main
 
 import (
+	"bufio"
+	"bytes"
 	"crypto/sha256"
 	"errors"
 	"github.com/cbergoon/merkletree"
+	"github.com/icza/bitio"
 	"image"
 	"math/bits"
 )
@@ -91,16 +94,17 @@ func (c *Chunk) Equals(o merkletree.Content) (bool, error) {
 }
 
 // Write writes the given bytes to the least significant bits of the chunk.
-func (c *Chunk) Write(p []byte) (n int, err error) {
-	for payloadByteIdx, payloadByte := range p {
-		for payloadBitIdx := uint8(0); payloadBitIdx < 8; payloadBitIdx++ {
-			lsb := BitAtIdx(payloadByte, payloadBitIdx)
-			pixIdx := n + payloadByteIdx
-			c.Pix[pixIdx] = WithLSB(c.Pix[pixIdx], lsb)
+func (c *Chunk) Write(p []byte) (int, error) {
+	r := bitio.NewReader(bytes.NewBuffer(p))
+	for i := 0; i < len(p); i++ {
+		bit, err := r.ReadBool()
+		if err != nil {
+			return c.n, err
 		}
-		n++
+		c.Pix[i] = WithLSB(c.Pix[i], bit)
+		c.n += 1
 	}
-	return n, nil
+	return c.n, nil
 }
 
 // BitAtIdx returns true if the bit at the given index is 1 and false if it is 0
@@ -108,20 +112,19 @@ func BitAtIdx(b byte, i uint8) bool {
 	return bits.OnesCount8(byte(1<<i)&b) > 0
 }
 
-func (c *Chunk) ReadLSB() ([]byte, error) {
-	byteArr := []byte{}
+func (c *Chunk) Read(p []byte) (int, error) {
+	b := bytes.NewBuffer(p)
+	w := bitio.NewWriter(b)
 	i := 0
-	for i < len(c.Pix) {
-		newByte := uint8(0)
-		for j := 0; j < 8; j++ {
-			if GetLSB(c.Pix[i+j]) {
-				newByte = newByte | byte(1<<j)
-			}
+	for i < b.Len() {
+		p := c.Pix[i]
+		err := w.WriteBool(GetLSB(p))
+		if err != nil {
+			return i, err
 		}
-		byteArr = append(byteArr, newByte)
-		i += 8
+		i++
 	}
-	return byteArr, nil
+	return i, nil
 }
 
 func (c *Chunk) LSBHash() ([]byte, error) {
