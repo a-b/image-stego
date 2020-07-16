@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"image"
@@ -32,7 +33,27 @@ func whiteImage(w, h int) *image.RGBA {
 	return img
 }
 
-func TestWrite_EmptyInput(t *testing.T) {
+func TestChunk_MaxPayloadSize1(t *testing.T) {
+	tests := []struct {
+		width  int
+		height int
+		want   int
+	}{
+		{2, 2, 2},
+		{1, 3, 1},
+		{100, 100, 5000},
+	}
+	for _, tt := range tests {
+		name := fmt.Sprintf("An image of size %d x %d can hold %d bytes", tt.width, tt.height, tt.want)
+		t.Run(name, func(t *testing.T) {
+			c := &Chunk{RGBA: whiteImage(tt.width, tt.height)}
+			got := c.MaxPayloadSize()
+			assert.Equal(t, tt.want, got, "MaxPayloadSize() = %v, want %v", got, tt.want)
+		})
+	}
+}
+
+func TestChunk_WriteEmptyInput(t *testing.T) {
 
 	chunk := Chunk{RGBA: blackImage(2, 2)}
 
@@ -48,7 +69,7 @@ func TestWrite_EmptyInput(t *testing.T) {
 	}
 }
 
-func TestWrite_SetAllBitsToOne(t *testing.T) {
+func TestChunk_WriteSetAllBitsToOne(t *testing.T) {
 
 	chunk := Chunk{RGBA: blackImage(2, 2)}
 
@@ -64,7 +85,7 @@ func TestWrite_SetAllBitsToOne(t *testing.T) {
 	}
 }
 
-func TestWrite_SetAllBitsToOneWithBreak(t *testing.T) {
+func TestChunk_WriteSetAllBitsToOneWithBreak(t *testing.T) {
 
 	chunk := Chunk{RGBA: blackImage(2, 2)}
 
@@ -86,7 +107,7 @@ func TestWrite_SetAllBitsToOneWithBreak(t *testing.T) {
 	}
 }
 
-func TestWrite_SetMixedBits(t *testing.T) {
+func TestChunk_WriteSetMixedBits(t *testing.T) {
 
 	chunk := Chunk{RGBA: blackImage(2, 2)}
 
@@ -104,7 +125,7 @@ func TestWrite_SetMixedBits(t *testing.T) {
 	assert.EqualValues(t, 1, chunk.Pix[12])
 }
 
-func TestWrite_MoreThanPossible(t *testing.T) {
+func TestChunk_WriteMoreThanPossible(t *testing.T) {
 
 	chunk := Chunk{RGBA: blackImage(2, 2)}
 
@@ -118,7 +139,7 @@ func TestWrite_MoreThanPossible(t *testing.T) {
 	assert.EqualValues(t, 1, chunk.Pix[15])
 }
 
-func TestWrite_PartialByteWritten(t *testing.T) {
+func TestChunk_WritePartialByteWritten(t *testing.T) {
 
 	chunk := Chunk{RGBA: blackImage(1, 3)} // 12 bytes
 
@@ -187,4 +208,21 @@ func TestRead_PartialReadBuffer(t *testing.T) {
 	assert.Equal(t, 8, chunk.rOff)
 	assert.EqualValues(t, ones, buffer[0])
 	assert.EqualValues(t, zeroes, buffer[1])
+}
+
+func TestReadWrite(t *testing.T) {
+	payload := []byte{42, 24}
+	chunk := Chunk{RGBA: whiteImage(2, 2)} // 16 bytes -> 2 bytes LSB
+
+	n, err := chunk.Write(payload)
+	require.NoError(t, err)
+	assert.Equal(t, 2, n)
+
+	parsed := make([]byte, 2)
+	n, err = chunk.Read(parsed)
+	require.NoError(t, err)
+	assert.Equal(t, 2, n)
+
+	assert.EqualValues(t, 42, parsed[0])
+	assert.EqualValues(t, 24, parsed[1])
 }

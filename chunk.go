@@ -18,6 +18,11 @@ type Chunk struct {
 	rOff int
 }
 
+// MaxPayloadSize returns the maximum number of bytes that can be written to this chunk
+func (c *Chunk) MaxPayloadSize() int {
+	return c.Width() * c.Height() * 4 / 8
+}
+
 // Width is a short hand to return the width in pixels of the chunk
 func (c *Chunk) Width() int {
 	return c.Bounds().Size().X
