@@ -14,15 +14,27 @@ const ones = 0b11111111
 // zeroes is a byte with all bits set to zero
 const zeroes = 0b00000000
 
-// emptyImage creates an RGBA image with 2x2 Pixels where all pixels are black. The underlying
-// Pix byte array contains 2x2 x 4 (RGBA) = 16 entries.
-func emptyImage(w, h int) *image.RGBA {
+// blackImage creates an RGBA image with the given width and height
+// where all pixels are black. The underlying Pix byte array
+// contains w x h x 4 entries.
+func blackImage(w, h int) *image.RGBA {
 	return image.NewRGBA(image.Rect(0, 0, w, h))
+}
+
+// whiteImage creates an RGBA image with the given width and height
+// where all pixels are white. The underlying Pix byte array
+// contains w x h x 4 entries.
+func whiteImage(w, h int) *image.RGBA {
+	img := image.NewRGBA(image.Rect(0, 0, w, h))
+	for i := range img.Pix {
+		img.Pix[i] = 0b11111111
+	}
+	return img
 }
 
 func TestWrite_EmptyInput(t *testing.T) {
 
-	chunk := Chunk{RGBA: emptyImage(2, 2)}
+	chunk := Chunk{RGBA: blackImage(2, 2)}
 
 	n, err := chunk.Write([]byte{})
 	require.NoError(t, err)
@@ -38,7 +50,7 @@ func TestWrite_EmptyInput(t *testing.T) {
 
 func TestWrite_SetAllBitsToOne(t *testing.T) {
 
-	chunk := Chunk{RGBA: emptyImage(2, 2)}
+	chunk := Chunk{RGBA: blackImage(2, 2)}
 
 	n, err := chunk.Write([]byte{ones, ones})
 	require.NoError(t, err)
@@ -54,7 +66,7 @@ func TestWrite_SetAllBitsToOne(t *testing.T) {
 
 func TestWrite_SetAllBitsToOneWithBreak(t *testing.T) {
 
-	chunk := Chunk{RGBA: emptyImage(2, 2)}
+	chunk := Chunk{RGBA: blackImage(2, 2)}
 
 	n, err := chunk.Write([]byte{ones})
 	require.NoError(t, err)
@@ -76,7 +88,7 @@ func TestWrite_SetAllBitsToOneWithBreak(t *testing.T) {
 
 func TestWrite_SetMixedBits(t *testing.T) {
 
-	chunk := Chunk{RGBA: emptyImage(2, 2)}
+	chunk := Chunk{RGBA: blackImage(2, 2)}
 
 	n, err := chunk.Write([]byte{0b11110000, 0b00001111})
 	require.NoError(t, err)
@@ -94,7 +106,7 @@ func TestWrite_SetMixedBits(t *testing.T) {
 
 func TestWrite_MoreThanPossible(t *testing.T) {
 
-	chunk := Chunk{RGBA: emptyImage(2, 2)}
+	chunk := Chunk{RGBA: blackImage(2, 2)}
 
 	n, err := chunk.Write([]byte{ones, ones, ones})
 	assert.EqualError(t, err, io.EOF.Error())
@@ -108,7 +120,7 @@ func TestWrite_MoreThanPossible(t *testing.T) {
 
 func TestWrite_PartialByteWritten(t *testing.T) {
 
-	chunk := Chunk{RGBA: emptyImage(1, 3)} // 12 bytes
+	chunk := Chunk{RGBA: blackImage(1, 3)} // 12 bytes
 
 	n, err := chunk.Write([]byte{ones, ones})
 	assert.EqualError(t, err, io.EOF.Error())
@@ -121,4 +133,17 @@ func TestWrite_PartialByteWritten(t *testing.T) {
 	assert.EqualValues(t, 1, chunk.Pix[7])
 	assert.EqualValues(t, 0, chunk.Pix[8])
 	assert.EqualValues(t, 0, chunk.Pix[11])
+}
+
+func TestRead_MatchingLength(t *testing.T) {
+	chunk := Chunk{RGBA: whiteImage(2, 2)} // 16 bytes -> 2 bytes LSB
+
+	buffer := make([]byte, 2)
+	n, err := chunk.Read(buffer)
+	require.NoError(t, err)
+
+	assert.Equal(t, 2, n)
+	for _, b := range buffer {
+		assert.EqualValues(t, 255, b)
+	}
 }

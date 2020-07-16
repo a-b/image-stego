@@ -132,19 +132,25 @@ func (c *Chunk) Write(p []byte) (n int, err error) {
 	return n, nil
 }
 
-func (c *Chunk) Read(p []byte) (int, error) {
-	b := bytes.NewBuffer(p)
+func (c *Chunk) Read(p []byte) (n int, err error) {
+
+	b :=bytes.NewBuffer(p)
+	b.Reset()
+
 	w := bitio.NewWriter(b)
-	i := 0
-	for i < b.Len() {
-		p := c.Pix[i]
-		err := w.WriteBool(GetLSB(p))
-		if err != nil {
-			return i, err
+	defer w.Close()
+
+	for i := 0; i< len(p); i++ {
+		for j := 0; j < 8; j++ {
+			err := w.WriteBool(GetLSB(c.Pix[i+j]))
+			if err != nil {
+				return i, err
+			}
 		}
-		i++
+		n += 1
 	}
-	return i, nil
+
+	return n, err
 }
 
 func (c *Chunk) LSBHash() ([]byte, error) {
