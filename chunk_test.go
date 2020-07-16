@@ -40,7 +40,7 @@ func TestWrite_EmptyInput(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Equal(t, 0, n)
-	assert.Equal(t, 0, chunk.off)
+	assert.Equal(t, 0, chunk.wOff)
 
 	// Test expected bit representation
 	for _, p := range chunk.Pix {
@@ -56,7 +56,7 @@ func TestWrite_SetAllBitsToOne(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Equal(t, 2, n)
-	assert.Equal(t, 16, chunk.off)
+	assert.Equal(t, 16, chunk.wOff)
 
 	// Test expected bit representation
 	for _, p := range chunk.Pix {
@@ -72,13 +72,13 @@ func TestWrite_SetAllBitsToOneWithBreak(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Equal(t, 1, n)
-	assert.Equal(t, 8, chunk.off)
+	assert.Equal(t, 8, chunk.wOff)
 
 	n, err = chunk.Write([]byte{ones})
 	require.NoError(t, err)
 
 	assert.Equal(t, 1, n)
-	assert.Equal(t, 16, chunk.off)
+	assert.Equal(t, 16, chunk.wOff)
 
 	// Test expected bit representation
 	for _, p := range chunk.Pix {
@@ -94,7 +94,7 @@ func TestWrite_SetMixedBits(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Equal(t, 2, n)
-	assert.Equal(t, 16, chunk.off)
+	assert.Equal(t, 16, chunk.wOff)
 
 	// Test expected bit representation
 	assert.EqualValues(t, 1, chunk.Pix[0])
@@ -112,7 +112,7 @@ func TestWrite_MoreThanPossible(t *testing.T) {
 	assert.EqualError(t, err, io.EOF.Error())
 
 	assert.Equal(t, 2, n)
-	assert.Equal(t, 16, chunk.off)
+	assert.Equal(t, 16, chunk.wOff)
 
 	// Test expected bit representation
 	assert.EqualValues(t, 1, chunk.Pix[15])
@@ -126,7 +126,7 @@ func TestWrite_PartialByteWritten(t *testing.T) {
 	assert.EqualError(t, err, io.EOF.Error())
 
 	assert.Equal(t, 1, n)
-	assert.Equal(t, 8, chunk.off)
+	assert.Equal(t, 8, chunk.wOff)
 
 	// Test expected bit representation
 	assert.EqualValues(t, 1, chunk.Pix[0])
@@ -146,4 +146,29 @@ func TestRead_MatchingLength(t *testing.T) {
 	for _, b := range buffer {
 		assert.EqualValues(t, 255, b)
 	}
+}
+
+func TestRead_SmallerReadBuffer(t *testing.T) {
+	chunk := Chunk{RGBA: whiteImage(2, 2)} // 16 bytes -> 2 bytes LSB
+
+	buffer := make([]byte, 1)
+	n, err := chunk.Read(buffer)
+	require.NoError(t, err)
+
+	assert.Equal(t, 1, n)
+	for _, b := range buffer {
+		assert.EqualValues(t, 255, b)
+	}
+}
+
+func TestRead_LargerReadBuffer(t *testing.T) {
+	chunk := Chunk{RGBA: whiteImage(2, 2)} // 16 bytes -> 2 bytes LSB
+
+	buffer := make([]byte, 3)
+	n, err := chunk.Read(buffer)
+	require.NoError(t, err)
+
+	assert.Equal(t, 2, n)
+	assert.EqualValues(t, 255, buffer[0])
+	assert.EqualValues(t, 255, buffer[0])
 }

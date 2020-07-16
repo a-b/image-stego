@@ -13,7 +13,7 @@ import (
 type Chunk struct {
 	*image.RGBA
 	// offset of written bits
-	off int
+	wOff int
 }
 
 // Width is a short hand to return the width in pixels of the chunk
@@ -103,12 +103,12 @@ func (c *Chunk) Write(p []byte) (n int, err error) {
 
 	defer func() {
 		// persist the bit offset (equivalent to the pix offset) for a subsequent call to Write.
-		c.off += n * 8
+		c.wOff += n * 8
 	}()
 
 	for i := 0; i < len(p); i++ {
 
-		bitOff := c.off + i*8
+		bitOff := c.wOff + i*8
 
 		// Stop early if there is not enough LSB space left
 		if bitOff+7 >= len(c.Pix) {
