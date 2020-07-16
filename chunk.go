@@ -8,7 +8,6 @@ import (
 	"github.com/icza/bitio"
 	"image"
 	"io"
-	"math/bits"
 )
 
 type Chunk struct {
@@ -94,46 +93,43 @@ func (c *Chunk) Equals(o merkletree.Content) (bool, error) {
 	return true, nil
 }
 
-// Write writes the given bytes to the least significant bits of the chunk. It returns the number of bytes written from p
-// A byte from p is either written completely or not at all.
+// Write writes the given bytes to the least significant bits of the chunk.
+// It returns the number of bytes written from p and an error if one occured.
+// Consult the io.Writer documentation for the intended behaviour of the function.
+// A byte from p is either written completely or not at all to the leas significant bits.
+// Subsequent calls to write will continue were the last write left off.
 func (c *Chunk) Write(p []byte) (n int, err error) {
 	r := bitio.NewReader(bytes.NewBuffer(p))
 
 	defer func() {
+		// persist the bit offset (equivalent to the pix offset) for a subsequent call to Write.
 		c.off += n * 8
 	}()
 
 	for i := 0; i < len(p); i++ {
 
-		buffer := make([]byte, 8)
-		bitOff := c.off+i * 8
+		bitOff := c.off + i*8
 
+		// Stop early if there is not enough LSB space left
 		if bitOff+7 >= len(c.Pix) {
 			return n, io.EOF
 		}
 
-		for j := range buffer {
+		for j := 0; j < 8; j++ {
 
 			bit, err := r.ReadBool()
 			if err != nil {
 				return n, err
 			}
 
-			buffer[j] = WithLSB(c.Pix[bitOff+j], bit)
+			c.Pix[bitOff+j] = WithLSB(c.Pix[bitOff+j], bit)
 		}
 
-		for j, b := range buffer {
-			c.Pix[bitOff+j] = b
-		}
-
+		// As one byte was written increment the counter
 		n += 1
 	}
-	return n, nil
-}
 
-// BitAtIdx returns true if the bit at the given index is 1 and false if it is 0
-func BitAtIdx(b byte, i uint8) bool {
-	return bits.OnesCount8(byte(1<<i)&b) > 0
+	return n, nil
 }
 
 func (c *Chunk) Read(p []byte) (int, error) {
