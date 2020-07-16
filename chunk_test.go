@@ -27,7 +27,7 @@ func blackImage(w, h int) *image.RGBA {
 func whiteImage(w, h int) *image.RGBA {
 	img := image.NewRGBA(image.Rect(0, 0, w, h))
 	for i := range img.Pix {
-		img.Pix[i] = 0b11111111
+		img.Pix[i] = ones
 	}
 	return img
 }
@@ -143,8 +143,9 @@ func TestRead_MatchingLength(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Equal(t, 2, n)
+	assert.Equal(t, 16, chunk.rOff)
 	for _, b := range buffer {
-		assert.EqualValues(t, 255, b)
+		assert.EqualValues(t, ones, b)
 	}
 }
 
@@ -156,8 +157,9 @@ func TestRead_SmallerReadBuffer(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Equal(t, 1, n)
+	assert.Equal(t, 8, chunk.rOff)
 	for _, b := range buffer {
-		assert.EqualValues(t, 255, b)
+		assert.EqualValues(t, ones, b)
 	}
 }
 
@@ -169,6 +171,20 @@ func TestRead_LargerReadBuffer(t *testing.T) {
 	require.EqualError(t, err, io.EOF.Error())
 
 	assert.Equal(t, 2, n)
-	assert.EqualValues(t, 255, buffer[0])
-	assert.EqualValues(t, 255, buffer[0])
+	assert.Equal(t, 16, chunk.rOff)
+	assert.EqualValues(t, ones, buffer[0])
+	assert.EqualValues(t, ones, buffer[0])
+}
+
+func TestRead_PartialReadBuffer(t *testing.T) {
+	chunk := Chunk{RGBA: whiteImage(1, 3)} // 12 bytes -> 1.5 bytes LSB
+
+	buffer := make([]byte, 2)
+	n, err := chunk.Read(buffer)
+	require.EqualError(t, err, io.EOF.Error())
+
+	assert.Equal(t, 1, n)
+	assert.Equal(t, 8, chunk.rOff)
+	assert.EqualValues(t, ones, buffer[0])
+	assert.EqualValues(t, zeroes, buffer[1])
 }
