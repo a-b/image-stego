@@ -13,7 +13,7 @@ import (
 )
 
 func main() {
-	if len(os.Args) > 0 && os.Args[1] == "-d" {
+	if len(os.Args) > 1 && os.Args[1] == "-d" {
 		Decode()
 		return
 	}
@@ -93,21 +93,32 @@ func main() {
 		log.Fatal(err)
 	}
 
-	fmt.Println("Start writing image...")
+	fmt.Println("MERKLE ROOT", hex.EncodeToString(t.MerkleRoot()))
+
+	fmt.Println("")
+	fmt.Println("")
+
 	destImg := image.NewRGBA(image.Rect(0, 0, m.Bounds().Dx(), m.Bounds().Dy()))
 	for cx := 0; cx < chunkCountX; cx++ {
 		for cy := 0; cy < chunkCountY; cy++ {
 			chunk := list[cx*chunkCountY+cy].(*Chunk)
+			prevHsh, _ := chunk.CalculateHash()
+			fmt.Println("-- Writing chunk at", cx, cy, hex.EncodeToString(prevHsh))
 			paths, sides, err := t.GetMerklePath(chunk)
 			if err != nil {
 				log.Fatal(err)
 			}
 
+			writeBuffer := []byte{}
+			writeBuffer = append(writeBuffer, uint8(len(paths)))
 			for i, path := range paths {
 				side := uint8(sides[i])
-				if _, err := chunk.Write(append([]byte{side}, path...)); err != nil {
-					log.Fatal(err)
-				}
+				writeBuffer = append(writeBuffer, side)
+				writeBuffer = append(writeBuffer, path...)
+			}
+
+			if _, err := chunk.Write(writeBuffer); err != nil {
+				log.Fatal(err)
 			}
 			draw.Draw(destImg, chunk.Bounds().Add(image.Pt(cx*chunkWidth, cy*chunkHeight)), chunk, image.Point{}, draw.Src)
 		}
@@ -123,7 +134,6 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-
 
 }
 

@@ -4,10 +4,11 @@ import (
 	"bytes"
 	"crypto/sha256"
 	"errors"
-	"github.com/cbergoon/merkletree"
-	"github.com/icza/bitio"
 	"image"
 	"io"
+
+	"github.com/cbergoon/merkletree"
+	"github.com/icza/bitio"
 )
 
 type Chunk struct {
@@ -61,45 +62,6 @@ func (c *Chunk) CalculateHash() ([]byte, error) {
 	return h.Sum(nil), nil
 }
 
-// Equals tests for equality of two Contents
-func (c *Chunk) Equals(o merkletree.Content) (bool, error) {
-
-	oc, ok := o.(*Chunk) // other chunk
-	if !ok {
-		return false, errors.New("invalid type casting")
-	}
-
-	if oc.Width() != c.Width() || oc.Height() != c.Height() {
-		return false, nil
-	}
-
-	for x := 0; x < c.Width(); x++ {
-		for y := 0; y < c.Height(); y++ {
-
-			thisColor := c.RGBAAt(x, y)
-			otherColor := oc.RGBAAt(x, y)
-
-			if WithLSB(thisColor.R, false) != WithLSB(otherColor.R, false) {
-				return false, nil
-			}
-
-			if WithLSB(thisColor.G, false) != WithLSB(otherColor.G, false) {
-				return false, nil
-			}
-
-			if WithLSB(thisColor.B, false) != WithLSB(otherColor.B, false) {
-				return false, nil
-			}
-
-			if WithLSB(thisColor.A, false) != WithLSB(otherColor.A, false) {
-				return false, nil
-			}
-		}
-	}
-
-	return true, nil
-}
-
 // Write writes the given bytes to the least significant bits of the chunk.
 // It returns the number of bytes written from p and an error if one occured.
 // Consult the io.Writer documentation for the intended behaviour of the function.
@@ -139,6 +101,7 @@ func (c *Chunk) Write(p []byte) (n int, err error) {
 	return n, nil
 }
 
+// Read reads the amount of bytes given in p from the LSBs of the image chunk.
 func (c *Chunk) Read(p []byte) (n int, err error) {
 
 	b := bytes.NewBuffer(p)
@@ -147,6 +110,7 @@ func (c *Chunk) Read(p []byte) (n int, err error) {
 
 	defer func() {
 		w.Close()
+		// persist the bit offset (equivalent to the pix offset) for a subsequent call to Read.
 		c.rOff += n * 8
 	}()
 
@@ -165,10 +129,51 @@ func (c *Chunk) Read(p []byte) (n int, err error) {
 				return i, err
 			}
 		}
+
+		// As one whole byte was read increment the counter
 		n += 1
 	}
 
 	return n, err
+}
+
+// Equals tests for equality of two Contents
+func (c *Chunk) Equals(o merkletree.Content) (bool, error) {
+
+	oc, ok := o.(*Chunk) // other chunk
+	if !ok {
+		return false, errors.New("invalid type casting")
+	}
+
+	if oc.Width() != c.Width() || oc.Height() != c.Height() {
+		return false, nil
+	}
+
+	for x := 0; x < c.Width(); x++ {
+		for y := 0; y < c.Height(); y++ {
+
+			thisColor := c.RGBAAt(x, y)
+			otherColor := oc.RGBAAt(x, y)
+
+			if WithLSB(thisColor.R, false) != WithLSB(otherColor.R, false) {
+				return false, nil
+			}
+
+			if WithLSB(thisColor.G, false) != WithLSB(otherColor.G, false) {
+				return false, nil
+			}
+
+			if WithLSB(thisColor.B, false) != WithLSB(otherColor.B, false) {
+				return false, nil
+			}
+
+			if WithLSB(thisColor.A, false) != WithLSB(otherColor.A, false) {
+				return false, nil
+			}
+		}
+	}
+
+	return true, nil
 }
 
 func (c *Chunk) LSBHash() ([]byte, error) {
