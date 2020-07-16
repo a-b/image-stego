@@ -14,6 +14,8 @@ type Chunk struct {
 	*image.RGBA
 	// offset of written bits
 	wOff int
+	// offset of read bits
+	rOff int
 }
 
 // Width is a short hand to return the width in pixels of the chunk
@@ -134,15 +136,26 @@ func (c *Chunk) Write(p []byte) (n int, err error) {
 
 func (c *Chunk) Read(p []byte) (n int, err error) {
 
-	b :=bytes.NewBuffer(p)
+	b := bytes.NewBuffer(p)
+	w := bitio.NewWriter(b)
 	b.Reset()
 
-	w := bitio.NewWriter(b)
-	defer w.Close()
+	defer func() {
+		w.Close()
+		c.rOff += n * 8
+	}()
 
-	for i := 0; i< len(p); i++ {
+	for i := 0; i < len(p); i++ {
+
+		bitOff := c.rOff + i*8
+
+		// Stop early if there are not enough LSBs left
+		if bitOff+7 >= len(c.Pix) {
+			return n, io.EOF
+		}
+
 		for j := 0; j < 8; j++ {
-			err := w.WriteBool(GetLSB(c.Pix[i+j]))
+			err := w.WriteBool(GetLSB(c.Pix[bitOff+j]))
 			if err != nil {
 				return i, err
 			}

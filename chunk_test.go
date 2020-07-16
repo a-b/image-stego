@@ -166,7 +166,7 @@ func TestRead_LargerReadBuffer(t *testing.T) {
 
 	buffer := make([]byte, 3)
 	n, err := chunk.Read(buffer)
-	require.NoError(t, err)
+	require.EqualError(t, err, io.EOF.Error())
 
 	assert.Equal(t, 2, n)
 	assert.EqualValues(t, 255, buffer[0])
