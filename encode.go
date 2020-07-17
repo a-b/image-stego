@@ -118,7 +118,8 @@ func encode(rgba *image.RGBA) {
 
 			for x := 0; x < bound.Dx(); x++ {
 				for y := 0; y < bound.Dy(); y++ {
-					color := rgba.RGBAAt(bound.Min.X*bound.Dx()+x, bound.Min.Y*bound.Dy()+y)
+					original := bound.Min.Add(image.Pt(x, y))
+					color := rgba.RGBAAt(original.X, original.Y)
 					chunk.Set(x, y, color)
 				}
 			}

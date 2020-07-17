@@ -5,9 +5,12 @@ import (
 	"math"
 )
 
-type Dimension struct {
-	Origin image.Point
-	Bounds image.Rectangle
+type Grid struct {
+	ChunkBounds [][]image.Rectangle
+}
+
+func NewGrid(rgba *image.RGBA) *Grid {
+	
 }
 
 func chunkBounds(rgba *image.RGBA) [][]image.Rectangle {
@@ -55,18 +58,6 @@ func chunkBounds(rgba *image.RGBA) [][]image.Rectangle {
 	cxOff := 0
 	cyOff := 0
 	for cx := 0; cx < chunkCountX; cx++ {
-
-		//cxOff := 0
-		//
-		//if cx < chunkWidthClippings {
-		//	cxOff = (chunkWidth + 1) * cx
-		//} else {
-		//	cxOff = chunkWidthClippings + cx * chunkWidth
-		//}
-		//
-		//
-		//cxOff+cx*cw
-		//
 
 		cw := chunkWidth
 		if cx < chunkWidthClippings {
