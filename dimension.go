@@ -86,7 +86,7 @@ func chunkBounds(rgba *image.RGBA) [][]image.Rectangle {
 				cyOff = chunkHeightClippings
 			}
 
-			bounds[cx][cy] = image.Rect(cxOff+cx*cw, cyOff+cy*ch, cw, ch)
+			bounds[cx][cy] = image.Rect(cw, ch, 0, 0).Add(image.Pt(cxOff+cx*cw, cyOff+cy*ch))
 		}
 	}
 
