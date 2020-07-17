@@ -2,6 +2,7 @@ package main
 
 import (
 	"crypto/sha256"
+	"dennis-tra/image-stego/steganography"
 	"encoding/hex"
 	"fmt"
 	"image"
@@ -52,7 +53,7 @@ func Decode() {
 
 	rgbaImage := imageToRGBA(m)
 
-	chunkCountX := 4
+	chunkCountX := 2
 	chunkCountY := 2
 	chunkWidth := m.Bounds().Size().X / chunkCountX
 	chunkHeight := m.Bounds().Size().Y / chunkCountY
@@ -73,36 +74,33 @@ func Decode() {
 				}
 			}
 
-
 			prevHash, _ := chunk.CalculateHash()
 			fmt.Println("-- Checking chunk at", cx, cy, hex.EncodeToString(prevHash))
 
+			//
+			//buffer := make([]byte, 99)
+			//_, err = chunk.Read(buffer)
+			//if err != nil {
+			//	log.Fatal(err)
+			//}
 
-			buffer := make([]byte, 99)
-			_, err = chunk.Read(buffer)
-			if err != nil {
-				log.Fatal(err)
-			}
+			buffer := steganography.Decode(67, chunk.SubImage(chunk.Bounds()))
 
 			pathCount := buffer[0]
 			fmt.Println("Read Path length", pathCount)
-			if pathCount != 3 {
+			if pathCount != 2 {
 				continue
 			}
 
-			fmt.Println("Chunk hash ", hex.EncodeToString(prevHash))
-			if err != nil {
-				log.Fatal(err)
-			}
 			i := 1
 			hsh := sha256.New()
-			w := []byte{}
 			for i+32 < len(buffer) {
+				w := []byte{}
 				side := buffer[i]
-				data := buffer[i : i+32]
+				data := buffer[i+1 : i+1+32]
 				fmt.Println("side", side)
 
-				i += 33
+				i += 32
 
 				if side == 1 { // left
 					w = append(w, data...)

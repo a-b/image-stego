@@ -39,9 +39,9 @@ func TestChunk_MaxPayloadSize1(t *testing.T) {
 		height int
 		want   int
 	}{
-		{2, 2, 2},
+		{2, 2, 1},
 		{1, 3, 1},
-		{100, 100, 5000},
+		{100, 100, 3750},
 	}
 	for _, tt := range tests {
 		name := fmt.Sprintf("An image of size %d x %d can hold %d bytes", tt.width, tt.height, tt.want)
@@ -73,15 +73,22 @@ func TestChunk_WriteSetAllBitsToOne(t *testing.T) {
 
 	chunk := Chunk{RGBA: blackImage(2, 2)}
 
-	n, err := chunk.Write([]byte{ones, ones})
+	n, err := chunk.Write([]byte{ones})
 	require.NoError(t, err)
 
-	assert.Equal(t, 2, n)
-	assert.Equal(t, 16, chunk.wOff)
+	assert.Equal(t, 1, n)
+	assert.Equal(t, 8, chunk.wOff)
 
 	// Test expected bit representation
-	for _, p := range chunk.Pix {
-		assert.EqualValues(t, 1, p)
+	for i, p := range chunk.Pix {
+		if i >= 8 {
+			break
+		}
+		if i%3 == 0 && i != 0{
+			assert.EqualValues(t, 0, p)
+		} else {
+			assert.EqualValues(t, 1, p)
+		}
 	}
 }
 

@@ -1,6 +1,8 @@
 package main
 
 import (
+	"bytes"
+	"dennis-tra/image-stego/steganography"
 	"encoding/hex"
 	"fmt"
 	"github.com/cbergoon/merkletree"
@@ -59,7 +61,7 @@ func main() {
 
 	rgbaImage := imageToRGBA(m)
 
-	chunkCountX := 4
+	chunkCountX := 2
 	chunkCountY := 2
 	chunkWidth := m.Bounds().Size().X / chunkCountX
 	chunkHeight := m.Bounds().Size().Y / chunkCountY
@@ -117,10 +119,13 @@ func main() {
 				writeBuffer = append(writeBuffer, path...)
 			}
 
-			if _, err := chunk.Write(writeBuffer); err != nil {
-				log.Fatal(err)
-			}
-			draw.Draw(destImg, chunk.Bounds().Add(image.Pt(cx*chunkWidth, cy*chunkHeight)), chunk, image.Point{}, draw.Src)
+			w := new(bytes.Buffer)
+			err = steganography.EncodeRGBA(w, chunk.RGBA, writeBuffer)
+			_ = err
+
+			i, _, _ := image.Decode(w)
+			a := imageToRGBA(i)
+			draw.Draw(destImg, a.Bounds().Add(image.Pt(cx*chunkWidth, cy*chunkHeight)), a, image.Point{}, draw.Src)
 		}
 	}
 

@@ -21,7 +21,7 @@ type Chunk struct {
 
 // MaxPayloadSize returns the maximum number of bytes that can be written to this chunk
 func (c *Chunk) MaxPayloadSize() int {
-	return c.Width() * c.Height() * 4 / 8
+	return c.Width() * c.Height() * 3 / 8
 }
 
 // Width is a short hand to return the width in pixels of the chunk
@@ -80,7 +80,7 @@ func (c *Chunk) Write(p []byte) (n int, err error) {
 		bitOff := c.wOff + i*8
 
 		// Stop early if there is not enough LSB space left
-		if bitOff+7 >= len(c.Pix) {
+		if bitOff+7 >= len(c.Pix)-len(c.Pix)/4 {
 			return n, io.EOF
 		}
 
@@ -91,7 +91,7 @@ func (c *Chunk) Write(p []byte) (n int, err error) {
 				return n, err
 			}
 
-			c.Pix[bitOff+j] = WithLSB(c.Pix[bitOff+j], bit)
+			c.Pix[bitOff+j+(bitOff+j)/3] = WithLSB(c.Pix[bitOff+j+(bitOff+j)/3], bit)
 		}
 
 		// As one byte was written increment the counter
