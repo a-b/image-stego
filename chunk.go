@@ -34,6 +34,17 @@ func (c *Chunk) Height() int {
 	return c.Bounds().Size().Y
 }
 
+// PixelCount returns the total number of pixels
+func (c *Chunk) PixelCount() int {
+	return len(c.Pix) / 4
+}
+
+// LSBCount returns the total number of least significant bits available for encoding a message.
+// Only the RGB values are considered not the A.
+func (c *Chunk) LSBCount() int {
+	return c.PixelCount() * 3
+}
+
 // CalculateHash calculates the SHA256 hash of the most significant bits. The least
 // significant bit (LSB) is not considered in the hash generation as it
 // is used to store the derived Merkle leaves.
