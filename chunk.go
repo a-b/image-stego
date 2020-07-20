@@ -135,7 +135,7 @@ func (c *Chunk) Read(p []byte) (n int, err error) {
 		}
 
 		for j := 0; j < 8; j++ {
-			err := w.WriteBool(GetLSB(c.Pix[bitOff+j]))
+			err := w.WriteBool(GetLSB(c.Pix[bitOff+j+(bitOff+j)/3]))
 			if err != nil {
 				return i, err
 			}

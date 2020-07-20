@@ -95,10 +95,6 @@ func main() {
 
 }
 
-func decode(filename *image.RGBA) {
-
-}
-
 // imageToRGBA converts image.Image to image.RGBA
 func imageToRGBA(src image.Image) *image.RGBA {
 	b := src.Bounds()

@@ -2,119 +2,69 @@ package main
 
 import (
 	"crypto/sha256"
-	"dennis-tra/image-stego/steganography"
 	"encoding/hex"
 	"fmt"
 	"image"
 	"log"
-	"os"
 )
 
-func Decode() {
+func decode(rgba *image.RGBA) {
 
-	filename := "outimage.png"
-	fmt.Println("Operating on", filename)
+	bounds := chunkBounds(rgba)
 
-	fmt.Println("Opening...")
-	reader, err := os.Open(filename)
-	if err != nil {
-		log.Fatal(err)
-	}
+	for cx, boundRow := range bounds {
+		for cy, bound := range boundRow {
 
-	fmt.Println("Decoding...")
-	m, _, err := image.Decode(reader)
-	if err != nil {
-		log.Fatal(err)
-	}
+			chunk := &Chunk{RGBA: image.NewRGBA(bound)}
 
-	fmt.Println("Closing...")
-	err = reader.Close()
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	fmt.Println("Image file dimensions", m.Bounds().Max)
-	totalPixels := m.Bounds().Size().X * m.Bounds().Size().Y
-	fmt.Println("Image total pixels", totalPixels)
-	lsbBits := totalPixels * 3
-	lsbBytes := float32(lsbBits) / 8.0
-	fmt.Println("LSB Bits", lsbBits)
-	fmt.Println("LSB Bytes", lsbBytes)
-	//maxNumHashes := lsbBits / 256
-	//fmt.Println("Maximum number of hashes", maxNumHashes)
-	//
-	//numOfChunks := 1.0
-	//
-	//for numOfChunks*math.Log2(numOfChunks) < float64(maxNumHashes)  {
-	//	numOfChunks++
-	//}
-	//fmt.Println("Total number of chunks", numOfChunks)
-	//
-
-	rgbaImage := imageToRGBA(m)
-
-	chunkCountX := 2
-	chunkCountY := 2
-	chunkWidth := m.Bounds().Size().X / chunkCountX
-	chunkHeight := m.Bounds().Size().Y / chunkCountY
-
-	fmt.Println("Chunk counts: ", chunkCountX, chunkCountY)
-	fmt.Println("Chunk dimensions: ", chunkWidth, chunkHeight)
-
-	for cx := 0; cx < chunkCountX; cx++ {
-		for cy := 0; cy < chunkCountY; cy++ {
-			chunk := &Chunk{
-				RGBA: image.NewRGBA(image.Rect(0, 0, chunkWidth, chunkHeight)),
-			}
-
-			for x := 0; x < chunkWidth; x++ {
-				for y := 0; y < chunkHeight; y++ {
-					color := rgbaImage.RGBAAt(cx*chunkWidth+x, cy*chunkHeight+y)
-					chunk.Set(x, y, color)
+			for x := 0; x < bound.Dx(); x++ {
+				for y := 0; y < bound.Dy(); y++ {
+					original := bound.Min.Add(image.Pt(x, y))
+					chunk.Set(original.X, original.Y, rgba.RGBAAt(original.X, original.Y))
 				}
 			}
 
-			prevHash, _ := chunk.CalculateHash()
-			fmt.Println("-- Checking chunk at", cx, cy, hex.EncodeToString(prevHash))
-
-			//
-			//buffer := make([]byte, 99)
-			//_, err = chunk.Read(buffer)
-			//if err != nil {
-			//	log.Fatal(err)
-			//}
-
-			buffer := steganography.Decode(67, chunk.SubImage(chunk.Bounds()))
-
-			pathCount := buffer[0]
-			fmt.Println("Read Path length", pathCount)
-			if pathCount != 2 {
-				continue
+			pathCount := make([]byte, 1)
+			_, err := chunk.Read(pathCount)
+			if err != nil {
+				log.Fatal(err)
 			}
 
-			i := 1
-			hsh := sha256.New()
-			for i+32 < len(buffer) {
-				w := []byte{}
-				side := buffer[i]
-				data := buffer[i+1 : i+1+32]
-				fmt.Println("side", side)
+			chunkHash, _ := chunk.CalculateHash()
+			prevHash := chunkHash
+			for i := 0; i < int(pathCount[0]); i++ {
+				side := make([]byte, 1)
+				data := make([]byte, 32)
 
-				i += 32
+				_, err := chunk.Read(side)
+				if err != nil {
+					log.Fatal(err)
+				}
+				_, err = chunk.Read(data)
+				if err != nil {
+					log.Fatal(err)
+				}
 
-				if side == 1 { // left
-					w = append(w, data...)
-					w = append(w, prevHash...)
-				} else if side == 0 {
-					w = append(w, prevHash...)
-					w = append(w, data...)
+				hsh := sha256.New()
+				buffer := []byte{}
+
+				if side[0] == 0 {
+					buffer = append(buffer, data...)
+					buffer = append(buffer, prevHash...)
+				} else if side[0] == 1 {
+					buffer = append(buffer, prevHash...)
+					buffer = append(buffer, data...)
 				} else {
-					continue
+					log.Fatal("Unsupported side")
 				}
-				hsh.Write(w)
+
+				hsh.Write(buffer)
 				prevHash = hsh.Sum(nil)
 			}
-			log.Println("MERKLE ROOT", hex.EncodeToString(prevHash))
+
+			fmt.Printf("Chunk (%02d/%02d) (Paths: %d) - %s - %s\n", cx, cy, pathCount[0], hex.EncodeToString(prevHash), hex.EncodeToString(chunkHash))
 		}
 	}
 }
+
+//f790c9c0597a04e3a119bfcbf1d0cfe3b977df7d98a0f54c45d6fc822bc52d52

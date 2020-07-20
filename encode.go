@@ -1,6 +1,8 @@
 package main
 
 import (
+	"bytes"
+	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
 	"github.com/cbergoon/merkletree"
@@ -85,6 +87,8 @@ func encode(rgba *image.RGBA) {
 		for cy, _ := range boundRow {
 			chunk := list[cx*len(boundRow)+cy].(*Chunk)
 
+			chash, _ := chunk.CalculateHash()
+
 			paths, sides, err := t.GetMerklePath(chunk)
 			if err != nil {
 				log.Fatal(err)
@@ -114,11 +118,25 @@ func encode(rgba *image.RGBA) {
 				log.Fatal(err)
 			}
 
+
 			writeBuffer := []byte{uint8(len(paths))}
 			for i, path := range paths {
 				side := uint8(sides[i])
 				writeBuffer = append(writeBuffer, side)
 				writeBuffer = append(writeBuffer, path...)
+				fmt.Println("--", i, cx, cy, hex.EncodeToString(path))
+
+				h := sha256.New()
+				if side == 0 {
+					h.Write(append(path, chash...))
+				} else {
+					h.Write(append(chash, path...))
+				}
+				chash = h.Sum(nil)
+			}
+
+			if !bytes.Equal(chash, t.MerkleRoot()) {
+				log.Fatal("ASAAHH")
 			}
 
 			_, err = chunk.Write(writeBuffer)
