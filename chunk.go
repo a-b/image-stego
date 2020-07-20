@@ -163,8 +163,8 @@ func (c *Chunk) Equals(o merkletree.Content) (bool, error) {
 	for x := 0; x < c.Width(); x++ {
 		for y := 0; y < c.Height(); y++ {
 
-			thisColor := c.RGBAAt(x, y)
-			otherColor := oc.RGBAAt(x, y)
+			thisColor := c.RGBAAt(c.Bounds().Min.X+x, c.Bounds().Min.Y+y)
+			otherColor := oc.RGBAAt(c.Bounds().Min.X+x, c.Bounds().Min.Y+y)
 
 			if WithLSB(thisColor.R, false) != WithLSB(otherColor.R, false) {
 				return false, nil

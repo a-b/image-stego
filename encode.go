@@ -132,7 +132,7 @@ func encode(rgba *image.RGBA) {
 
 	out, err = os.Create("out/encoded.png")
 	if err != nil {
-		// Handle error
+		log.Fatal(err)
 	}
 	defer out.Close()
 
