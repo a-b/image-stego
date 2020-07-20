@@ -76,8 +76,6 @@ func decode(rgba *image.RGBA) {
 				roots[merkleRoot] = []Index{}
 			}
 			roots[merkleRoot] = append(roots[merkleRoot], Index{cx: cx, cy: cy})
-
-			fmt.Printf("Chunk (%02d/%02d) (Paths: %d) - %s - %s\n", cx, cy, pathCount[0], merkleRoot, hex.EncodeToString(chunkHash))
 		}
 	}
 
@@ -90,7 +88,12 @@ func decode(rgba *image.RGBA) {
 		}
 	}
 
-	fmt.Println("The merkle root, that appeared multiple times is:", canonicalMerkleRoot)
+	if len(roots) == 1 {
+		fmt.Println("This image is sane - the merkle root:", canonicalMerkleRoot)
+		return
+	} else {
+		fmt.Println("The merkle root, that appeared multiple times is:", canonicalMerkleRoot)
+	}
 
 	overlayImage := imageToRGBA(rgba.SubImage(rgba.Bounds()))
 
