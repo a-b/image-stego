@@ -5,12 +5,23 @@ import (
 	"encoding/hex"
 	"fmt"
 	"image"
+	"image/color"
+	"image/draw"
+	"image/png"
 	"log"
+	"os"
 )
+
+type Index struct {
+	cx int
+	cy int
+}
 
 func decode(rgba *image.RGBA) {
 
 	bounds := chunkBounds(rgba)
+
+	roots := map[string][]Index{}
 
 	for cx, boundRow := range bounds {
 		for cy, bound := range boundRow {
@@ -38,33 +49,78 @@ func decode(rgba *image.RGBA) {
 
 				_, err := chunk.Read(side)
 				if err != nil {
-					log.Fatal(err)
+					//log.Fatal(err)
 				}
+
 				_, err = chunk.Read(data)
 				if err != nil {
-					log.Fatal(err)
+					//log.Fatal(err)
 				}
 
 				hsh := sha256.New()
-				buffer := []byte{}
 
 				if side[0] == 0 {
-					buffer = append(buffer, data...)
-					buffer = append(buffer, prevHash...)
-				} else if side[0] == 1 {
-					buffer = append(buffer, prevHash...)
-					buffer = append(buffer, data...)
+					prevHash = append(data, prevHash...)
 				} else {
-					log.Fatal("Unsupported side")
+					prevHash = append(prevHash, data...)
 				}
 
-				hsh.Write(buffer)
+				hsh.Write(prevHash)
 				prevHash = hsh.Sum(nil)
 			}
 
-			fmt.Printf("Chunk (%02d/%02d) (Paths: %d) - %s - %s\n", cx, cy, pathCount[0], hex.EncodeToString(prevHash), hex.EncodeToString(chunkHash))
+			merkleRoot := hex.EncodeToString(prevHash)
+
+			_, exists := roots[merkleRoot]
+			if !exists {
+				roots[merkleRoot] = []Index{}
+			}
+			roots[merkleRoot] = append(roots[merkleRoot], Index{cx: cx, cy: cy})
+
+			fmt.Printf("Chunk (%02d/%02d) (Paths: %d) - %s - %s\n", cx, cy, pathCount[0], merkleRoot, hex.EncodeToString(chunkHash))
 		}
 	}
-}
 
-//f790c9c0597a04e3a119bfcbf1d0cfe3b977df7d98a0f54c45d6fc822bc52d52
+	m := 0
+	canonicalMerkleRoot := ""
+	for merkleRoot, indices := range roots {
+		if len(indices) > m {
+			m = len(indices)
+			canonicalMerkleRoot = merkleRoot
+		}
+	}
+
+	fmt.Println("The merkle root, that appeared multiple times is:", canonicalMerkleRoot)
+
+	overlayImage := imageToRGBA(rgba.SubImage(rgba.Bounds()))
+
+	for merkleRoot, indices := range roots {
+		for _, idx := range indices {
+			bound := bounds[idx.cx][idx.cy]
+			chunk := &Chunk{RGBA: image.NewRGBA(bound)}
+
+			if merkleRoot != canonicalMerkleRoot {
+				draw.DrawMask(
+					overlayImage,
+					chunk.Bounds(),
+					&image.Uniform{C: color.RGBA{R: 255, A: 255}},
+					image.Point{},
+					&image.Uniform{C: color.RGBA{R: 255, G: 255, B: 255, A: 80}},
+					image.Point{},
+					draw.Over,
+				)
+			}
+		}
+	}
+
+	out, err := os.Create("out/decoded-overlay.png")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer out.Close()
+
+	err = png.Encode(out, overlayImage)
+	if err != nil {
+		log.Fatal(err)
+	}
+}

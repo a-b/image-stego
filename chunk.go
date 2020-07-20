@@ -130,7 +130,7 @@ func (c *Chunk) Read(p []byte) (n int, err error) {
 		bitOff := c.rOff + i*8
 
 		// Stop early if there are not enough LSBs left
-		if bitOff+7 >= len(c.Pix) {
+		if bitOff+8+(bitOff+8)/3 >= len(c.Pix) {
 			return n, io.EOF
 		}
 
