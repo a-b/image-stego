@@ -100,21 +100,6 @@ func encode(rgba *image.RGBA) {
 				log.Fatal(err)
 			}
 
-			chunkFile, err := os.Create(fmt.Sprintf("out/chunks/%02d_%02d.png", cx, cy))
-			if err != nil {
-				log.Fatal(err)
-			}
-			defer chunkFile.Close()
-
-			chunkImage := image.NewRGBA(chunk.Bounds())
-			draw.Draw(chunkImage, chunk.Bounds(), chunk, chunk.Bounds().Min, draw.Src)
-
-			err = png.Encode(chunkFile, chunkImage)
-			if err != nil {
-				log.Fatal(err)
-			}
-
-
 			writeBuffer := []byte{uint8(len(paths))}
 			for i, path := range paths {
 				side := uint8(sides[i])
