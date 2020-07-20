@@ -5,24 +5,32 @@ import (
 	"math"
 )
 
-type Grid struct {
-	ChunkBounds [][]image.Rectangle
-}
-
-func NewGrid(rgba *image.RGBA) *Grid {
-	
-}
-
 func chunkBounds(rgba *image.RGBA) [][]image.Rectangle {
 
 	chunk := Chunk{RGBA: rgba}
+
+	chunkCount := 2
+	for {
+		neededBitsPerChunk := int(math.Ceil(math.Log2(float64(chunkCount))))*265 + 8 // 8 -> path count, 265 -> Merkle tree side
+		neededBitsTotal := chunkCount * neededBitsPerChunk
+
+		bitsPerChunk := chunk.LSBCount() / chunkCount
+		clippings := chunk.LSBCount() % chunkCount
+		bytesPerChunk := (bitsPerChunk - clippings) / 8
+		if neededBitsTotal > chunk.LSBCount() || neededBitsPerChunk > bytesPerChunk*8 {
+			break
+		}
+
+		chunkCount += 2
+	}
+	chunkCount -= 2
 
 	hashBitLength := 256
 	merkleSideBitLength := 1
 	maxNumHashes := chunk.LSBCount() / (hashBitLength + merkleSideBitLength)
 
 	numOfChunks := 1
-	for numOfChunks*int(math.Floor(math.Log2(float64(numOfChunks)))) < maxNumHashes {
+	for numOfChunks*int(math.Ceil(math.Log2(float64(numOfChunks)))) < maxNumHashes {
 		numOfChunks++
 	}
 
@@ -30,10 +38,15 @@ func chunkBounds(rgba *image.RGBA) [][]image.Rectangle {
 		numOfChunks -= 1
 	}
 
+	numOfChunks = chunkCount - 20
+
 	// Calculate optimal distribution of chunks along width and height
 	factors := primeFactors(numOfChunks)
 	chunkCountX := factors[len(factors)-1]
-	chunkCountY := factors[len(factors)-2]
+	chunkCountY := 1
+	if len(factors) > 1 {
+		chunkCountY = factors[len(factors)-2]
+	}
 	for i := len(factors) - 3; i >= 0; i-- {
 		if chunkCountX > chunkCountY {
 			chunkCountY *= factors[i]
@@ -82,4 +95,30 @@ func chunkBounds(rgba *image.RGBA) [][]image.Rectangle {
 	}
 
 	return bounds
+}
+
+func primeFactors(n int) (pfs []int) {
+	// Get the number of 2s that divide n
+	for n%2 == 0 {
+		pfs = append(pfs, 2)
+		n = n / 2
+	}
+
+	// n must be odd at this point. so we can skip one element
+	// (note i = i + 2)
+	for i := 3; i*i <= n; i = i + 2 {
+		// while i divides n, append i and divide n
+		for n%i == 0 {
+			pfs = append(pfs, i)
+			n = n / i
+		}
+	}
+
+	// This condition is to handle the case when n is a prime number
+	// greater than 2
+	if n > 2 {
+		pfs = append(pfs, n)
+	}
+
+	return
 }

@@ -14,100 +14,9 @@ import (
 
 func encode(rgba *image.RGBA) {
 
-	//chunk := Chunk{RGBA: rgba}
-	//
-	//hashBitLength := 256
-	//merkleSideBitLength := 1
-	//maxNumHashes := chunk.LSBCount() / (hashBitLength + merkleSideBitLength)
-	//
-	//numOfChunks := 1
-	//for numOfChunks*int(math.Floor(math.Log2(float64(numOfChunks)))) < maxNumHashes {
-	//	numOfChunks++
-	//}
-	//
-	//if numOfChunks%2 != 0 {
-	//	numOfChunks -= 1
-	//}
-	//fmt.Println("Total number of chunks", numOfChunks)
-	//
-	//// Calculate optimal distribution of chunks along width and height
-	//factors := primeFactors(numOfChunks)
-	//chunkCountX := factors[len(factors)-1]
-	//chunkCountY := factors[len(factors)-2]
-	//for i := len(factors) - 3; i >= 0; i-- {
-	//	if chunkCountX > chunkCountY {
-	//		chunkCountY *= factors[i]
-	//	} else {
-	//		chunkCountX *= factors[i]
-	//	}
-	//}
-	//
-	//if chunkCountX*chunkCountY != numOfChunks {
-	//	log.Fatal("AAAH")
-	//}
-	//
-	//fmt.Printf("Divide width in %d parts\n", chunkCountX)
-	//fmt.Printf("Divide height in %d parts\n", chunkCountY)
-	//
-	//// Add clippings (the side length to chunk count ration will likely be rational so we add the remainder to the
-	//// side lengths equally.
-	//chunkWidth := chunk.Width() / chunkCountX
-	//chunkHeight := chunk.Height() / chunkCountY
-	//
-	//chunkWidthClippings := chunk.Width() % chunkCountX
-	//chunkHeightClippings := chunk.Height() % chunkCountY
-	//
-	//fmt.Println("Start building merkle tree...")
 	overlayImage := imageToRGBA(rgba.SubImage(rgba.Bounds()))
 
-	//cxOff := 0
-	//cyOff := 0
 	var list []merkletree.Content
-	//for cx := 0; cx < chunkCountX; cx++ {
-	//
-	//	cw := chunkWidth
-	//	if cx < chunkWidthClippings {
-	//		cw += 1
-	//		cxOff = 0
-	//	} else {
-	//		cxOff = chunkWidthClippings
-	//	}
-	//
-	//	for cy := 0; cy < chunkCountY; cy++ {
-	//
-	//		ch := chunkHeight
-	//		if cy < chunkHeightClippings {
-	//			ch += 1
-	//			cyOff = 0
-	//		} else {
-	//			cyOff = chunkHeightClippings
-	//		}
-	//
-	//		chunk := &Chunk{RGBA: image.NewRGBA(image.Rect(0, 0, cw, ch))}
-	//
-	//		for x := 0; x < cw; x++ {
-	//			for y := 0; y < ch; y++ {
-	//				color := rgba.RGBAAt(cx*cw+x, cy*ch+y)
-	//				chunk.Set(x, y, color)
-	//			}
-	//		}
-	//		hash, _ := chunk.CalculateHash()
-	//		list = append(list, chunk)
-	//
-	//		var clr color.RGBA
-	//		if (cx%2 == 0 && cy%2 == 0) || (cx%2 != 0 && cy%2 != 0) {
-	//			clr = color.RGBA{B: 255, A: 255}
-	//		} else {
-	//			clr = color.RGBA{R: 255, A: 255}
-	//		}
-	//
-	//		draw.DrawMask(overlayImage, chunk.Bounds().Add(image.Pt(cxOff+cx*cw, cyOff+cy*ch)), &image.Uniform{C: clr}, image.Point{}, &image.Uniform{C: color.RGBA{R: 255, G: 255, B: 255, A: 80}}, image.Point{}, draw.Over)
-	//		if cx == 0 {
-	//			fmt.Printf("Chunk (%d/%d) size (%dx%d) hash: %s\n", cx, cy, cw, ch, hex.EncodeToString(hash))
-	//		}
-	//	}
-	//}
-
 
 	bounds := chunkBounds(rgba)
 
@@ -119,13 +28,12 @@ func encode(rgba *image.RGBA) {
 			for x := 0; x < bound.Dx(); x++ {
 				for y := 0; y < bound.Dy(); y++ {
 					original := bound.Min.Add(image.Pt(x, y))
-					color := rgba.RGBAAt(original.X, original.Y)
-					chunk.Set(x, y, color)
+					chunk.Set(original.X, original.Y, rgba.RGBAAt(original.X, original.Y))
 				}
 			}
-			hash, _ := chunk.CalculateHash()
 			list = append(list, chunk)
 
+			// Draw mask image
 			var clr color.RGBA
 			if (cx%2 == 0 && cy%2 == 0) || (cx%2 != 0 && cy%2 != 0) {
 				clr = color.RGBA{B: 255, A: 255}
@@ -133,11 +41,15 @@ func encode(rgba *image.RGBA) {
 				clr = color.RGBA{R: 255, A: 255}
 			}
 
-			draw.DrawMask(overlayImage, chunk.Bounds(), &image.Uniform{C: clr}, image.Point{}, &image.Uniform{C: color.RGBA{R: 255, G: 255, B: 255, A: 80}}, image.Point{}, draw.Over)
-			if cx == 0 {
-				fmt.Printf("Chunk (%d/%d) size (%dx%d) hash: %s\n", cx, cy, bound.Dx(), bound.Dy(), hex.EncodeToString(hash))
-			}
-
+			draw.DrawMask(
+				overlayImage,
+				chunk.Bounds(),
+				&image.Uniform{C: clr},
+				image.Point{},
+				&image.Uniform{C: color.RGBA{R: 255, G: 255, B: 255, A: 80}},
+				image.Point{},
+				draw.Over,
+			)
 		}
 	}
 
@@ -147,11 +59,9 @@ func encode(rgba *image.RGBA) {
 		log.Fatal(err)
 	}
 
-	fmt.Println("Merkle Tree Root:", hex.EncodeToString(t.MerkleRoot()))
-
-	out, err := os.Create("overlay.png")
+	out, err := os.Create("out/overlay.png")
 	if err != nil {
-		// Handle error
+		log.Fatal(err)
 	}
 	defer out.Close()
 
@@ -159,30 +69,75 @@ func encode(rgba *image.RGBA) {
 	if err != nil {
 		log.Fatal(err)
 	}
-}
 
-func primeFactors(n int) (pfs []int) {
-	// Get the number of 2s that divide n
-	for n%2 == 0 {
-		pfs = append(pfs, 2)
-		n = n / 2
+	fmt.Println("Merkle Tree Root:", hex.EncodeToString(t.MerkleRoot()))
+	//---------------------
+
+	ch, err := os.Create("out/chunk-hashes.txt")
+	if err != nil {
+		log.Fatal(err)
 	}
+	defer ch.Close()
 
-	// n must be odd at this point. so we can skip one element
-	// (note i = i + 2)
-	for i := 3; i*i <= n; i = i + 2 {
-		// while i divides n, append i and divide n
-		for n%i == 0 {
-			pfs = append(pfs, i)
-			n = n / i
+	destImg := image.NewRGBA(rgba.Bounds())
+
+	for cx, boundRow := range bounds {
+		for cy, _ := range boundRow {
+			chunk := list[cx*len(boundRow)+cy].(*Chunk)
+
+			paths, sides, err := t.GetMerklePath(chunk)
+			if err != nil {
+				log.Fatal(err)
+			}
+
+			chunkHash, err := chunk.CalculateHash()
+			if err != nil {
+				log.Fatal(err)
+			}
+
+			_, err = ch.Write([]byte(fmt.Sprintf("%02d_%02d.png,%s\n", cx, cy, hex.EncodeToString(chunkHash))))
+			if err != nil {
+				log.Fatal(err)
+			}
+
+			chunkFile, err := os.Create(fmt.Sprintf("out/chunks/%02d_%02d.png", cx, cy))
+			if err != nil {
+				log.Fatal(err)
+			}
+			defer chunkFile.Close()
+
+			chunkImage := image.NewRGBA(chunk.Bounds())
+			draw.Draw(chunkImage, chunk.Bounds(), chunk, chunk.Bounds().Min, draw.Src)
+
+			err = png.Encode(chunkFile, chunkImage)
+			if err != nil {
+				log.Fatal(err)
+			}
+
+			writeBuffer := []byte{uint8(len(paths))}
+			for i, path := range paths {
+				side := uint8(sides[i])
+				writeBuffer = append(writeBuffer, side)
+				writeBuffer = append(writeBuffer, path...)
+			}
+
+			_, err = chunk.Write(writeBuffer)
+			if err != nil {
+				log.Fatal(err)
+			}
+
+			draw.Draw(destImg, chunk.Bounds(), chunk, chunk.Bounds().Min, draw.Src)
 		}
 	}
 
-	// This condition is to handle the case when n is a prime number
-	// greater than 2
-	if n > 2 {
-		pfs = append(pfs, n)
+	out, err = os.Create("out/out.png")
+	if err != nil {
+		// Handle error
 	}
+	defer out.Close()
 
-	return
+	err = png.Encode(out, destImg)
+	if err != nil {
+		log.Fatal(err)
+	}
 }

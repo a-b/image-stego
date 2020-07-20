@@ -21,7 +21,7 @@ type Chunk struct {
 
 // MaxPayloadSize returns the maximum number of bytes that can be written to this chunk
 func (c *Chunk) MaxPayloadSize() int {
-	return c.Width() * c.Height() * 3 / 8
+	return c.LSBCount() / 8
 }
 
 // Width is a short hand to return the width in pixels of the chunk
@@ -58,7 +58,7 @@ func (c *Chunk) CalculateHash() ([]byte, error) {
 			// TODO: Evaluate if this should be changed to a bit reader,
 			// that really just considers the most significant bits
 			// instead of zero-ing the LSBs
-			color := c.RGBAAt(x, y)
+			color := c.RGBAAt(c.Bounds().Min.X+x, c.Bounds().Min.Y+y)
 			byt := []byte{
 				WithLSB(color.R, false),
 				WithLSB(color.G, false),
