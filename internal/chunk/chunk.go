@@ -12,14 +12,16 @@ import (
 	"github.com/icza/bitio"
 )
 
+const (
+	// BitsPerPixel says how many colors should be used for LSB encoding.
+	// 1 - only R, 2 - R and G, 3 - R, G and B, 4 - R, G, B and A
+	BitsPerPixel = 3
+)
+
 // Chunk is a wrapper around an image.RGBA struct that keeps track of
 // the read and written bits to the LSBs of the image.RGBA
 type Chunk struct {
 	*image.RGBA
-	// offset of written bits
-	wOff int
-	// offset of read bits
-	rOff int
 }
 
 // MaxPayloadSize returns the maximum number of bytes that can be written to this chunk
@@ -45,7 +47,7 @@ func (c *Chunk) PixelCount() int {
 // LSBCount returns the total number of least significant bits available for encoding a message.
 // Only the RGB values are considered not the A.
 func (c *Chunk) LSBCount() int {
-	return c.PixelCount() * 3
+	return c.PixelCount() * BitsPerPixel
 }
 
 // CalculateHash calculates the SHA256 hash of the most significant bits. The least
@@ -60,14 +62,13 @@ func (c *Chunk) CalculateHash() ([]byte, error) {
 
 	for x := 0; x < c.Width(); x++ {
 		for y := 0; y < c.Height(); y++ {
-			// TODO: Evaluate if this should be changed to a bit reader,
-			// that really just considers the most significant bits
-			// instead of zero-ing the LSBs
-			color := c.RGBAAt(c.Bounds().Min.X+x, c.Bounds().Min.Y+y)
+
+			rgba := c.RGBA.RGBAAt(x, y)
+
 			byt := []byte{
-				bit.WithLSB(color.R, false),
-				bit.WithLSB(color.G, false),
-				bit.WithLSB(color.B, false),
+				bit.WithLSB(rgba.R, false),
+				bit.WithLSB(rgba.G, false),
+				bit.WithLSB(rgba.B, false),
 			}
 			if _, err := h.Write(byt); err != nil {
 				return nil, err
@@ -86,14 +87,9 @@ func (c *Chunk) CalculateHash() ([]byte, error) {
 func (c *Chunk) Write(p []byte) (n int, err error) {
 	r := bitio.NewReader(bytes.NewBuffer(p))
 
-	defer func() {
-		// persist the bit offset (equivalent to the pix offset) for a subsequent call to Write.
-		c.wOff += n * 8
-	}()
-
 	for i := 0; i < len(p); i++ {
 
-		bitOff := c.wOff + i*8
+		bitOff := i*8
 
 		// Stop early if there is not enough LSB space left
 		if bitOff+7 >= len(c.Pix)-len(c.Pix)/4 {
@@ -106,7 +102,6 @@ func (c *Chunk) Write(p []byte) (n int, err error) {
 			if err != nil {
 				return n, err
 			}
-
 
 			c.Pix[bitOff+j+(bitOff+j)/3] = bit.WithLSB(c.Pix[bitOff+j+(bitOff+j)/3], bitVal)
 		}
@@ -124,24 +119,20 @@ func (c *Chunk) Read(p []byte) (n int, err error) {
 	b := bytes.NewBuffer(p)
 	w := bitio.NewWriter(b)
 	b.Reset()
-
-	defer func() {
-		w.Close()
-		// persist the bit offset (equivalent to the pix offset) for a subsequent call to Read.
-		c.rOff += n * 8
-	}()
+	defer w.Close()
 
 	for i := 0; i < len(p); i++ {
 
-		bitOff := c.rOff + i*8
+		// calculate current read bit offset: static read offset from potential last run plus idx-var times bits in a byte
+		bitOff := i*8
 
 		// Stop early if there are not enough LSBs left
-		if bitOff+8+(bitOff+8)/3 >= len(c.Pix) {
+		if bitOff+8+(bitOff+8)/BitsPerPixel > len(c.Pix) {
 			return n, io.EOF
 		}
 
 		for j := 0; j < 8; j++ {
-			err := w.WriteBool(bit.GetLSB(c.Pix[bitOff+j+(bitOff+j)/3]))
+			err := w.WriteBool(bit.GetLSB(c.Pix[bitOff+j+(bitOff+j)/BitsPerPixel]))
 			if err != nil {
 				return i, err
 			}
