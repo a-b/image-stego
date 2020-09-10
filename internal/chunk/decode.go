@@ -4,23 +4,27 @@ import (
 	"crypto/sha256"
 	"dennis-tra/image-stego/internal/utils"
 	"encoding/hex"
-	"fmt"
 	"image"
 	"image/color"
 	"image/draw"
 	"image/png"
+	"log"
 	"os"
+	"path"
 )
 
-func Decode(filename string) error {
+func Decode(filepath string) error {
 
-	rgba , err:= OpenImageFile(filename)
+	log.Println("Opening image:", filepath)
+	rgba, err := OpenImageFile(filepath)
 	if err != nil {
 		return err
 	}
 
+	log.Println("Calculating bounds...")
 	bounds := CalculateChunkBounds(rgba)
 
+	log.Println("Calculating Merkle tree roots for every chunk...")
 	roots := map[string][]Index{}
 
 	for cx, boundRow := range bounds {
@@ -89,14 +93,19 @@ func Decode(filename string) error {
 	}
 
 	if len(roots) == 1 {
-		fmt.Println("This image is sane - the merkle root:", canonicalMerkleRoot)
+		log.Println("This image has not been tampered with. All chunks have the same Merkle Root:")
+		log.Println("\t", canonicalMerkleRoot)
 		return nil
-	} else {
-		fmt.Println("The merkle root, that appeared multiple times is:", canonicalMerkleRoot)
 	}
 
-	overlayImage := utils.ImageToRGBA(rgba.SubImage(rgba.Bounds()))
+	log.Println("Found multiple Merkle Roots. This image has been tampered with. RootHashes:")
+	log.Println("Count\tRoot")
+	for root, indexes := range roots {
+		log.Printf("%07d\t%s\n", len(indexes), root)
+	}
 
+	log.Println("Drawing overlay image of altered regions...")
+	overlayImage := utils.ImageToRGBA(rgba.SubImage(rgba.Bounds()))
 	for merkleRoot, indices := range roots {
 		for _, idx := range indices {
 			bound := bounds[idx.cx][idx.cy]
@@ -116,7 +125,9 @@ func Decode(filename string) error {
 		}
 	}
 
-	out, err := os.Create("out/decoded-overlay.png")
+	overlay := path.Join(path.Dir(filepath), utils.SetExtension(path.Base(filepath), ".overlay.png"))
+	log.Println("Saving overlay image:", overlay)
+	out, err := os.Create(overlay)
 	if err != nil {
 		return err
 	}

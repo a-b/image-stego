@@ -3,7 +3,6 @@ package chunk
 import (
 	"dennis-tra/image-stego/internal/utils"
 	"encoding/hex"
-	"fmt"
 	"github.com/cbergoon/merkletree"
 	"image"
 	"image/color"
@@ -11,11 +10,14 @@ import (
 	"image/png"
 	"log"
 	"os"
+	"path"
 )
 
-func Encode(filename string, outdir string) error {
+func Encode(filepath string, outdir string) error {
+	filename:= path.Base(filepath)
 
-	rgba, err := OpenImageFile(filename)
+	log.Println("Opening image:", filepath)
+	rgba, err := OpenImageFile(filepath)
 	if err != nil {
 		return err
 	}
@@ -25,10 +27,13 @@ func Encode(filename string, outdir string) error {
 
 	var list []merkletree.Content
 
+	log.Println("Calculating bounds...")
 	bounds := CalculateChunkBounds(rgba)
 
-	for cx, boundRow := range bounds {
-		for cy, bound := range boundRow {
+	log.Println("Building merkle tree...")
+	// Build merkle tree
+	for _, boundRow := range bounds {
+		for _, bound := range boundRow {
 
 			chunk := &Chunk{RGBA: image.NewRGBA(bound)}
 
@@ -39,6 +44,23 @@ func Encode(filename string, outdir string) error {
 				}
 			}
 			list = append(list, chunk)
+		}
+	}
+
+	// Create a new Merkle Tree from the list of Content
+	t, err := merkletree.NewTree(list)
+	if err != nil {
+		log.Fatal(err)
+	}
+	log.Println("Merkle Tree Root Hash:")
+	log.Println("\t", hex.EncodeToString(t.MerkleRoot()))
+
+	log.Println("Drawing overlay image...")
+	// Draw overlay image
+	for cx, boundRow := range bounds {
+		for cy, bound := range boundRow {
+
+			chunk := &Chunk{RGBA: image.NewRGBA(bound)}
 
 			// Draw mask image
 			var clr color.RGBA
@@ -59,14 +81,10 @@ func Encode(filename string, outdir string) error {
 			)
 		}
 	}
+	overlay := path.Join(outdir, utils.SetExtension(filename, ".overlay.png"))
+	log.Println("Saving overlay image:", overlay)
 
-	// Create a new Merkle Tree from the list of Content
-	t, err := merkletree.NewTree(list)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	out, err := os.Create("out/overlay.png")
+	out, err := os.Create(overlay)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -77,32 +95,13 @@ func Encode(filename string, outdir string) error {
 		log.Fatal(err)
 	}
 
-	fmt.Println("Merkle Tree Root:", hex.EncodeToString(t.MerkleRoot()))
-	//---------------------
-
-	ch, err := os.Create("out/chunk-hashes.txt")
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer ch.Close()
-
+	log.Println("Encoding Merkle Tree information into LSBs of the image")
 	destImg := image.NewRGBA(rgba.Bounds())
-
 	for cx, boundRow := range bounds {
 		for cy, _ := range boundRow {
 			chunk := list[cx*len(boundRow)+cy].(*Chunk)
 
 			paths, sides, err := t.GetMerklePath(chunk)
-			if err != nil {
-				log.Fatal(err)
-			}
-
-			chunkHash, err := chunk.CalculateHash()
-			if err != nil {
-				log.Fatal(err)
-			}
-
-			_, err = ch.Write([]byte(fmt.Sprintf("%02d_%02d.png,%s\n", cx, cy, hex.EncodeToString(chunkHash))))
 			if err != nil {
 				log.Fatal(err)
 			}
@@ -123,7 +122,9 @@ func Encode(filename string, outdir string) error {
 		}
 	}
 
-	out, err = os.Create("out/encoded.png")
+	encoded := path.Join(outdir, utils.SetExtension(filename, ".png"))
+	log.Println("Saving encoded image:", encoded)
+	out, err = os.Create(encoded)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -133,5 +134,6 @@ func Encode(filename string, outdir string) error {
 	if err != nil {
 		log.Fatal(err)
 	}
+
 	return nil
 }
