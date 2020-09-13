@@ -5,16 +5,6 @@ import (
 	"math"
 )
 
-const (
-	// The number of bits occupied by one SHA256 hash
-	HashBitLength = 256
-
-	// The number of bits occupied by the side information of a merkle tree leaf.
-	MerkleSideBitLength = 8
-
-	// The number of bits occupied by the information of how many merkle tree leafs are encoded in the chunk.
-	PathCountBitLength = 8
-)
 
 // CalculateChunkBounds takes the given *image.RGBA and calculates the optimal distribution of image chunks
 // to encode the merkle tree data.

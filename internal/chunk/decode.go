@@ -30,15 +30,11 @@ func Decode(filepath string) error {
 	for cx, boundRow := range bounds {
 		for cy, bound := range boundRow {
 
-			chunk := &Chunk{RGBA: image.NewRGBA(bound)}
-
-			for x := 0; x < bound.Dx(); x++ {
-				for y := 0; y < bound.Dy(); y++ {
-					original := bound.Min.Add(image.Pt(x, y))
-					chunk.Set(original.X, original.Y, rgba.RGBAAt(original.X, original.Y))
-				}
+			chunk := &Chunk{
+				RGBA: utils.ImageToRGBA(rgba.SubImage(bound)),
 			}
 
+			// First byte contains the number of hashes in this chunk (called paths in the merkletree package)
 			pathCount := make([]byte, 1)
 			_, err := chunk.Read(pathCount)
 			if err != nil {
@@ -48,25 +44,33 @@ func Decode(filepath string) error {
 			chunkHash, _ := chunk.CalculateHash()
 			prevHash := chunkHash
 			for i := 0; i < int(pathCount[0]); i++ {
+				// The order in which the hashes should be concatenated to calculate the composite hash
 				side := make([]byte, 1)
+
+				// The hash data for the new composite hash
 				data := make([]byte, 32)
 
+				// EOFs can happen if pathCount is wrong due to image manipulation
+				// of that specific chunk. pathCount could be way larger than
+				// the maximum chunk payload, therefore an EOF can happen.
 				_, err := chunk.Read(side)
 				if err != nil {
-					//return err
+					break
 				}
 
 				_, err = chunk.Read(data)
 				if err != nil {
-					//return err
+					break
 				}
 
 				hsh := sha256.New()
 
 				if side[0] == 0 {
 					prevHash = append(data, prevHash...)
-				} else {
+				} else if side[0] == 1 {
 					prevHash = append(prevHash, data...)
+				} else {
+					break
 				}
 
 				hsh.Write(prevHash)
@@ -75,6 +79,7 @@ func Decode(filepath string) error {
 
 			merkleRoot := hex.EncodeToString(prevHash)
 
+			// persist root hash
 			_, exists := roots[merkleRoot]
 			if !exists {
 				roots[merkleRoot] = []Index{}
@@ -83,6 +88,7 @@ func Decode(filepath string) error {
 		}
 	}
 
+	// Find the root hash that appeared multiple times
 	m := 0
 	canonicalMerkleRoot := ""
 	for merkleRoot, indices := range roots {
@@ -93,15 +99,15 @@ func Decode(filepath string) error {
 	}
 
 	if len(roots) == 1 {
-		log.Println("This image has not been tampered with. All chunks have the same Merkle Root:")
-		log.Println("\t", canonicalMerkleRoot)
+		log.Println("This image has not been tampered with. All chunks have the same Merkle Root:", canonicalMerkleRoot)
 		return nil
 	}
 
-	log.Println("Found multiple Merkle Roots. This image has been tampered with. RootHashes:")
+	log.Println("Found multiple Merkle Roots. This image has been tampered with! RootHashes:")
+
 	log.Println("Count\tRoot")
 	for root, indexes := range roots {
-		log.Printf("%07d\t%s\n", len(indexes), root)
+		log.Printf("%5d\t%s\n", len(indexes), root)
 	}
 
 	log.Println("Drawing overlay image of altered regions...")
@@ -137,5 +143,6 @@ func Decode(filepath string) error {
 	if err != nil {
 		return err
 	}
+
 	return nil
 }

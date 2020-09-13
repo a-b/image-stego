@@ -52,8 +52,7 @@ func Encode(filepath string, outdir string) error {
 	if err != nil {
 		log.Fatal(err)
 	}
-	log.Println("Merkle Tree Root Hash:")
-	log.Println("\t", hex.EncodeToString(t.MerkleRoot()))
+	log.Println("Merkle Tree Root Hash:", hex.EncodeToString(t.MerkleRoot()))
 
 	log.Println("Drawing overlay image...")
 	// Draw overlay image
