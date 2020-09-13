@@ -1,6 +1,8 @@
 package chunk
 
 import (
+	"bytes"
+	"crypto/sha256"
 	"fmt"
 	"image"
 	"io"
@@ -81,6 +83,7 @@ func TestChunk_WriteEmptyInput(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Equal(t, 0, n)
+	assert.Equal(t, 0, chunk.wOff)
 
 	// Test expected bit representation
 	for _, p := range chunk.Pix {
@@ -96,6 +99,7 @@ func TestChunk_WriteSetAllBitsToOne(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Equal(t, 1, n)
+	assert.Equal(t, 1, chunk.wOff)
 
 	// Test expected bit representation
 	for i, p := range chunk.Pix {
@@ -118,6 +122,7 @@ func TestChunk_WriteSetMixedBits(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Equal(t, 2, n)
+	assert.Equal(t, 2, chunk.wOff)
 
 	// Test expected bit representation
 	expects := []PixExpect{
@@ -146,6 +151,7 @@ func TestChunk_WriteMoreThanPossible(t *testing.T) {
 	assert.EqualError(t, err, io.EOF.Error())
 
 	assert.Equal(t, 2, n)
+	assert.Equal(t, 2, chunk.wOff)
 
 	// Test expected bit representation
 	assert.EqualValues(t, 1, chunk.Pix[20])
@@ -159,6 +165,7 @@ func TestChunk_WritePartialByteWritten(t *testing.T) {
 	assert.EqualError(t, err, io.EOF.Error())
 
 	assert.Equal(t, 1, n)
+	assert.Equal(t, 1, chunk.wOff)
 
 	// Test expected bit representation
 	expects := []PixExpect{
@@ -186,6 +193,8 @@ func TestRead_MatchingLength(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Equal(t, 9, n)
+	assert.Equal(t, 9, chunk.rOff)
+
 	for _, b := range buffer {
 		assert.EqualValues(t, ones, b)
 	}
@@ -199,6 +208,8 @@ func TestRead_SmallerReadBuffer(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Equal(t, 1, n)
+	assert.Equal(t, 1, chunk.rOff)
+
 	for _, b := range buffer {
 		assert.EqualValues(t, ones, b)
 	}
@@ -212,6 +223,8 @@ func TestRead_LargerReadBuffer(t *testing.T) {
 	require.EqualError(t, err, io.EOF.Error())
 
 	assert.Equal(t, 2, n)
+	assert.Equal(t, 2, chunk.rOff)
+
 	assert.EqualValues(t, ones, buffer[0])
 	assert.EqualValues(t, ones, buffer[0])
 }
@@ -224,6 +237,8 @@ func TestRead_PartialReadBuffer(t *testing.T) {
 	require.EqualError(t, err, io.EOF.Error())
 
 	assert.Equal(t, 1, n)
+	assert.Equal(t, 1, chunk.rOff)
+
 	assert.EqualValues(t, ones, buffer[0])
 	assert.EqualValues(t, zeroes, buffer[1])
 }
@@ -235,16 +250,51 @@ func TestReadWrite(t *testing.T) {
 	n, err := chunk.Write(payload)
 	require.NoError(t, err)
 	assert.Equal(t, 2, n)
+	assert.Equal(t, 2, chunk.wOff)
 
 	parsed := make([]byte, 2)
 	n, err = chunk.Read(parsed)
 	require.NoError(t, err)
+
 	assert.Equal(t, 2, n)
+	assert.Equal(t, 2, chunk.rOff)
 
 	assert.EqualValues(t, 42, parsed[0])
 	assert.EqualValues(t, 24, parsed[1])
 }
 
+func TestReadWriteSeparate(t *testing.T) {
+	hash := sha256.New()
+	payload := hash.Sum([]byte{})
+
+	chunk := Chunk{RGBA: whiteImage(100, 100)}
+
+	n, err := chunk.Write(payload[0:20])
+	require.NoError(t, err)
+	assert.Equal(t, 20, n)
+	assert.Equal(t, 20, chunk.wOff)
+
+	n, err = chunk.Write(payload[20:])
+	require.NoError(t, err)
+	assert.Equal(t, 12, n)
+	assert.Equal(t, 32, chunk.wOff)
+
+	parsed1 := make([]byte, 20)
+	n, err = chunk.Read(parsed1)
+	require.NoError(t, err)
+
+	assert.Equal(t, 20, n)
+	assert.Equal(t, 20, chunk.rOff)
+
+	parsed2 := make([]byte, 12)
+	n, err = chunk.Read(parsed2)
+	require.NoError(t, err)
+
+	assert.Equal(t, 12, n)
+	assert.Equal(t, 32, chunk.rOff)
+
+	assert.True(t, bytes.Equal(payload, append(parsed1, parsed2...)))
+}
 
 // PixExpect holds an index and expected bit value.
 type PixExpect struct {

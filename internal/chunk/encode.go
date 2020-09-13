@@ -14,7 +14,7 @@ import (
 )
 
 func Encode(filepath string, outdir string) error {
-	filename:= path.Base(filepath)
+	filename := path.Base(filepath)
 
 	log.Println("Opening image:", filepath)
 	rgba, err := OpenImageFile(filepath)
@@ -106,7 +106,8 @@ func Encode(filepath string, outdir string) error {
 				log.Fatal(err)
 			}
 
-			writeBuffer := []byte{uint8(len(paths))}
+			writeBuffer := []byte{}
+			writeBuffer = append(writeBuffer, uint8(len(paths)))
 			for i, path := range paths {
 				side := uint8(sides[i])
 				writeBuffer = append(writeBuffer, side)

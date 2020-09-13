@@ -19,9 +19,13 @@ const (
 )
 
 // Chunk is a wrapper around an image.RGBA struct that keeps track of
-// the read and written bits to the LSBs of the image.RGBA
+// the read and written bytes to the LSBs of the image.RGBA
 type Chunk struct {
 	*image.RGBA
+
+	rOff int
+
+	wOff int
 }
 
 // MaxPayloadSize returns the maximum number of bytes that can be written to this chunk
@@ -87,9 +91,11 @@ func (c *Chunk) CalculateHash() ([]byte, error) {
 func (c *Chunk) Write(p []byte) (n int, err error) {
 	r := bitio.NewReader(bytes.NewBuffer(p))
 
+	defer func() { c.wOff += n }()
+
 	for i := 0; i < len(p); i++ {
 
-		bitOff := i*8
+		bitOff := (c.wOff + i) * 8
 
 		// Stop early if there is not enough LSB space left
 		if bitOff+7 >= len(c.Pix)-len(c.Pix)/4 {
@@ -103,7 +109,8 @@ func (c *Chunk) Write(p []byte) (n int, err error) {
 				return n, err
 			}
 
-			c.Pix[bitOff+j+(bitOff+j)/3] = bit.WithLSB(c.Pix[bitOff+j+(bitOff+j)/3], bitVal)
+			idx := bitOff + j + (bitOff+j)/BitsPerPixel
+			c.Pix[idx] = bit.WithLSB(c.Pix[idx], bitVal)
 		}
 
 		// As one byte was written increment the counter
@@ -119,12 +126,15 @@ func (c *Chunk) Read(p []byte) (n int, err error) {
 	b := bytes.NewBuffer(p)
 	w := bitio.NewWriter(b)
 	b.Reset()
-	defer w.Close()
+	defer func() {
+		w.Close()
+		c.rOff += n
+	}()
 
 	for i := 0; i < len(p); i++ {
 
 		// calculate current read bit offset: static read offset from potential last run plus idx-var times bits in a byte
-		bitOff := i*8
+		bitOff := (c.rOff + i) * 8
 
 		// Stop early if there are not enough LSBs left
 		if bitOff+8+(bitOff+8)/BitsPerPixel > len(c.Pix) {
@@ -132,9 +142,12 @@ func (c *Chunk) Read(p []byte) (n int, err error) {
 		}
 
 		for j := 0; j < 8; j++ {
-			err := w.WriteBool(bit.GetLSB(c.Pix[bitOff+j+(bitOff+j)/BitsPerPixel]))
+			idx := bitOff + j + (bitOff+j)/BitsPerPixel
+
+			v := bit.GetLSB(c.Pix[idx])
+			err := w.WriteBool(v)
 			if err != nil {
-				return i, err
+				return n, err
 			}
 		}
 
