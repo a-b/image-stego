@@ -8,7 +8,6 @@ import (
 	"log"
 	"path"
 
-	"dennis-tra/image-stego/internal/utils"
 	"github.com/cbergoon/merkletree"
 )
 
@@ -22,7 +21,7 @@ func Encode(filepath string, outdir string) error {
 	}
 
 	// copy original image for the checker pattern image to visualize the chunk bounds
-	checkerImg := utils.ImageToRGBA(originalImg.SubImage(originalImg.Bounds()))
+	checkerImg := ImageToRGBA(originalImg.SubImage(originalImg.Bounds()))
 
 	list := []merkletree.Content{}
 
@@ -33,7 +32,7 @@ func Encode(filepath string, outdir string) error {
 	for _, boundsRow := range bounds {
 		for _, bound := range boundsRow {
 			list = append(list, &Chunk{
-				RGBA: utils.ImageToRGBA(originalImg.SubImage(bound)),
+				RGBA: ImageToRGBA(originalImg.SubImage(bound)),
 			})
 		}
 	}
@@ -68,7 +67,7 @@ func Encode(filepath string, outdir string) error {
 		}
 	}
 
-	checkerFilepath := path.Join(outdir, utils.SetExtension(filename, ".checker.png"))
+	checkerFilepath := path.Join(outdir, SetExtension(filename, ".checker.png"))
 	log.Println("Saving checker pattern overlay image:", checkerFilepath)
 	err = SaveImageFile(checkerFilepath, checkerImg)
 	if err != nil {
@@ -104,7 +103,7 @@ func Encode(filepath string, outdir string) error {
 		}
 	}
 
-	encodedFilepath := path.Join(outdir, utils.SetExtension(filename, ".png"))
+	encodedFilepath := path.Join(outdir, SetExtension(filename, ".png"))
 	log.Println("Saving encoded image:", encodedFilepath)
 	err = SaveImageFile(encodedFilepath, encodedImg)
 	if err != nil {

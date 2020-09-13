@@ -50,18 +50,22 @@ func (c *Chunk) LSBCount() int {
 	return c.PixelCount() * BitsPerPixel
 }
 
+// MinX in this context returns the starting value for iterating over the horizontal axis of the image
 func (c *Chunk) MinX() int {
 	return c.Bounds().Min.X
 }
 
+// MaxX in this context returns the ending value for iterating over the horizontal axis of the image
 func (c *Chunk) MaxX() int {
 	return c.Bounds().Max.X
 }
 
+// MinY in this context returns the starting value for iterating over the vertical axis of the image
 func (c *Chunk) MinY() int {
 	return c.Bounds().Min.Y
 }
 
+// MaxY in this context returns the ending value for iterating over the vertical axis of the image
 func (c *Chunk) MaxY() int {
 	return c.Bounds().Max.Y
 }

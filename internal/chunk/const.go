@@ -5,7 +5,7 @@ const (
 	// 1 - only R, 2 - R and G, 3 - R, G and B, 4 - R, G, B and A
 	BitsPerPixel = 3
 
-	// The number of bits occupied by one SHA256 hash
+	// The number of bits occupied by one SHA256 hash.
 	HashBitLength = 256
 
 	// The number of bits occupied by the side information of a merkle tree leaf.

@@ -10,9 +10,9 @@ import (
 // to encode the merkle tree data.
 //
 // The more chunks we anticipate the smaller they become, the more of them are there and the more data needs
-// to be encoded in one chunk to store all the merkle tree data. So there is clearly an optimum of chunk
-// count. Basically we want the highest number of chunks where each individual one can still store all
-// the necessary merkle information.
+// to be encoded in each chunk to store all the merkle tree data. So there is an optimum of the number of chunks.
+// Basically we want the highest number of chunks where each individual one can still store all the necessary
+// merkle information.
 //
 // The calculation is an iterative process. The calculation starts with the assumption that we want to use
 // two chunks to encode the data. First it calculates the required amount of bits to encode all merkle nodes
@@ -135,6 +135,7 @@ func chunkDist(count int) (int, int) {
 }
 
 // primeFactors returns what the name says ;)
+// Src: https://siongui.github.io/2017/05/09/go-find-all-prime-factors-of-integer-number/
 func primeFactors(n int) (pfs []int) {
 	// Get the number of 2s that divide n
 	for n%2 == 0 {

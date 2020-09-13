@@ -8,8 +8,6 @@ import (
 	"image/draw"
 	"log"
 	"path"
-
-	"dennis-tra/image-stego/internal/utils"
 )
 
 func Decode(filepath string) error {
@@ -31,7 +29,7 @@ func Decode(filepath string) error {
 		for y, bound := range boundRow {
 
 			chunk := &Chunk{
-				RGBA: utils.ImageToRGBA(probeImg.SubImage(bound)),
+				RGBA: ImageToRGBA(probeImg.SubImage(bound)),
 			}
 
 			// First byte contains the number of hashes in this chunk (called paths in the merkletree package)
@@ -112,7 +110,7 @@ func Decode(filepath string) error {
 
 	log.Println("Drawing overlay image of altered regions...")
 
-	overlayImg := utils.ImageToRGBA(probeImg.SubImage(probeImg.Bounds()))
+	overlayImg := ImageToRGBA(probeImg.SubImage(probeImg.Bounds()))
 	for merkleRoot, indices := range rootHashes {
 		for _, idx := range indices {
 
@@ -132,7 +130,7 @@ func Decode(filepath string) error {
 		}
 	}
 
-	overlayFilepath := path.Join(path.Dir(filepath), utils.SetExtension(path.Base(filepath), ".overlay.png"))
+	overlayFilepath := path.Join(path.Dir(filepath), SetExtension(path.Base(filepath), ".overlay.png"))
 	log.Println("Saving overlay image:", overlayFilepath)
 	err = SaveImageFile(overlayFilepath, overlayImg)
 	if err != nil {
