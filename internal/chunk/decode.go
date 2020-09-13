@@ -111,10 +111,10 @@ func Decode(filepath string) error {
 	log.Println("Drawing overlay image of altered regions...")
 
 	overlayImg := ImageToRGBA(probeImg.SubImage(probeImg.Bounds()))
-	for merkleRoot, indices := range rootHashes {
+	for root, indices := range rootHashes {
 		for _, idx := range indices {
 
-			if merkleRoot == merkleRoot {
+			if root == merkleRoot {
 				continue
 			}
 
